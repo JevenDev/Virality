@@ -1,0 +1,152 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #111;
+    color: #fff;
+    font-family: "Special Gothic", sans-serif;
+    text-align: center;
+}
+  
+h1 {
+    margin: 20px 0;
+}
+    
+label {
+    display: block;
+    margin: 10px 0 5px;
+}
+
+input[type="range"] {
+    width: 1000px;
+}
+
+.button-group {
+    margin: 10px 0 30px 0;
+}
+
+button {
+    background: #3f51b5;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    margin: 0 10px;
+    cursor: pointer;
+    font-size: 16px;
+    border-radius: 6px;
+}
+
+button:hover {
+    background: #5c6bc0;
+}
+
+#dropzone {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    width: 60%;
+    padding: 20px;
+    border: 2px dashed #555;
+    border-radius: 12px 12px 0 0;
+    background: #1a1a1a;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+#dropzone.hover {
+    background: #2a2a2a;
+    border-color: #999;
+}  
+
+
+#nowPlaying {
+    margin: 20px 0;
+    font-size: 18px;
+    color: #ccc;
+}
+
+#waveformCanvas {
+    width: 1000px;
+    height: 150px;
+    background: #222;
+    margin: 20px auto;
+    border-radius: 10px;
+    display: block;
+}
+
+.time-display {
+    width: 1000px;
+    margin: 5px auto 20px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: #aaa;
+}
+
+.progress-container {
+    width: 1000px;
+    margin: 20px auto 0;
+    position: relative;
+}
+
+#progressBar {
+    width: 100%;
+    height: 8px;
+    background: #333;
+    border-radius: 5px;
+    appearance: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}  
+
+#progressBar::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #7f92ff;
+    border-radius: 50%;
+    cursor: pointer;
+    margin-top: -2px;
+}
+
+#progressBar::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: #7f92ff;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.hover-time {
+    position: absolute;
+    top: 40px;
+    transform: translateX(-50%);
+    background: transparent;
+    font-size: 0.8rem;
+    color: #aaa;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.preset-buttons {
+    margin-top: 20px;
+}
+
+.preset-buttons button {
+    background: #444;
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    margin: 0 5px;
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: 5px;
+}
+
+.preset-buttons button:hover {
+    background: #666;
+}
