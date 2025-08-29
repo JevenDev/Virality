@@ -626,6 +626,17 @@ function adjustStickyOffsets(){
   window.addEventListener('resize',()=>{ adjustStickyOffsets(); if(currentBuffer){ wfBars=null; drawWaveform(currentBuffer);} else drawPlaceholderWave(); });
 })();
 
+// Make the sticky pill clickable to open the file picker
+const dropzoneEl = document.getElementById('dropzone');
+const filePicker  = document.getElementById('fileInput');
+
+if (dropzoneEl && filePicker) {
+  dropzoneEl.addEventListener('click', () => filePicker.click());
+  dropzoneEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); filePicker.click(); }
+  });
+}
+
 /********* init *********/
 (function init(){
   if (formatSelect) formatSelect.value='wav';   // default export WAV

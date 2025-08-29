@@ -4,8 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Slowed + Reverb Studio (Vanilla JS)</title>
+
+  <!-- CSS -->
   <link rel="stylesheet" href="./style.css?v=9" />
-  <!-- Libraries -->
+
+  <!-- Libraries (same order, deferred) -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js" defer></script>
@@ -23,6 +26,7 @@
     </div>
   </section>
 
+  <!-- Sticky top bar -->
   <header class="topbar top-fixed">
     <div class="brand">
       <div class="logo">🎧</div>
@@ -59,7 +63,9 @@
     <!-- Global Player (waveform + progress) -->
     <section id="playerPanel" class="panel player">
       <h2 id="nowPlayingTitle" class="now-playing">Now Playing</h2>
+
       <canvas id="waveCanvas" width="1200" height="180" class="wave"></canvas>
+
       <div class="scrub">
         <span id="playTime">0:00</span>
         <div class="progress thin">
@@ -67,7 +73,11 @@
         </div>
         <span id="playTotal">0:00</span>
       </div>
-      <!-- <button id="globalPlayPause" class="btn">Play</button> -->
+
+      <!-- Global Play/Pause row (new: keeps spacing simple & reliable) -->
+      <div id="playerControlsRow" class="player-controls-row">
+        <button id="globalPlayPause" class="btn">Play</button>
+      </div>
     </section>
 
     <!-- Controls (2/3) -->
@@ -102,19 +112,7 @@
       </div>
     </section>
 
-    <!-- Drag & Drop (full width) -->
-    <section class="panel drop-panel">
-      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Drop audio files here">
-        <p>Drag & drop audio files here</p>
-        <p class="muted">or</p>
-        <label class="btn">
-          Browse files
-          <input id="fileInput" type="file" accept="audio/*" multiple hidden />
-        </label>
-      </div>
-    </section>
-
-    <!-- Files list (under drop) -->
+    <!-- Files list -->
     <section class="panel files-panel">
       <div class="files-header">
         <h2>Files (<span id="fileCount">0</span>)</h2>
@@ -123,5 +121,18 @@
       <div id="fileList" class="file-list"></div>
     </section>
   </main>
+
+  <!-- Sticky Drop Footer (new location for the dropzone) -->
+  <div class="drop-footer">
+    <div class="drop-footer-inner">
+      <div id="dropzone" class="dropzone dropzone-footer" tabindex="0" aria-label="Add audio files">
+        🎵 Drag and drop audio file(s) here 🎵
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input for Browse / click from footer pill -->
+  <input id="fileInput" type="file" accept="audio/*" multiple hidden />
+
 </body>
 </html>
