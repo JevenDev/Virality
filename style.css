@@ -1,152 +1,150 @@
-* {
-    margin: 0;
-    padding: 0;
+:root {
+  --bg: #0b0b0b;
+  --panel: #151515;
+  --muted: #8b8b8b;
+  --text: #f2f2f2;
+
+  /* updated dynamically by JS based on the fixed top bar height */
+  --topbar-h: 64px;
 }
 
+* { box-sizing: border-box; }
+html, body { height: 100%; }
 body {
-    background: #111;
-    color: #fff;
-    font-family: "Special Gothic", sans-serif;
-    text-align: center;
-}
-  
-h1 {
-    margin: 20px 0;
-}
-    
-label {
-    display: block;
-    margin: 10px 0 5px;
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  /* push content below the fixed header */
+  padding-top: var(--topbar-h);
 }
 
-input[type="range"] {
-    width: 1000px;
+/* ========== Top bar (now fixed) ========== */
+.topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:16px; padding:16px 20px; border-bottom:1px solid #222;
+  background: var(--bg);
+}
+.topbar.top-fixed {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 10000;
+  background: rgba(11,11,11,0.92);
+  backdrop-filter: saturate(140%) blur(6px);
+  border-bottom: 1px solid #222;
+}
+.brand { display:flex; align-items:center; gap:12px; }
+.logo { width:36px; height:36px; background:#1f1f1f; border-radius:12px; display:grid; place-items:center; box-shadow:0 2px 8px rgba(0,0,0,.35); }
+.topbar h1 { margin:0; font-size:18px; font-weight:600; }
+.topbar p { margin:0; color:var(--muted); font-size:12px; }
+
+.actions-row { display:flex; align-items:center; gap:10px; flex-wrap: wrap; }
+.format { display:flex; align-items:center; gap:6px; font-size:13px; color:#d0d0d0; }
+.format select {
+  background:#1f1f1f; color:var(--text);
+  border:1px solid #333; border-radius:8px; padding:6px 10px;
 }
 
-.button-group {
-    margin: 10px 0 30px 0;
+/* ========== Layout ========== */
+.container {
+  max-width: 1240px; margin: 0 auto; padding: 20px;
+  display:grid; grid-template-columns: 2fr 1fr; gap:14px;
+}
+.panel {
+  background: var(--panel); border:1px solid #212121; border-radius:16px;
+  padding:16px; box-shadow:0 2px 8px rgba(0,0,0,.35);
+}
+.panel h2 { margin:0 0 10px 0; font-size:14px; font-weight:600; }
+
+/* Global Player */
+.player { grid-column: 1 / -1; }
+.now-playing { text-align:center; margin: 0 0 8px 0; font-weight:600; }
+
+/* IMPORTANT: canvas is sized by CSS; JS will sync bitmap size to avoid stretching */
+.wave {
+  width:100%;
+  height:130px;              /* reduced from 180px (~50px smaller) */
+  display:block;
+  background:#0f0f0f;
+  border-radius:14px;
 }
 
-button {
-    background: #3f51b5;
-    color: #fff;
-    border: none;
-    padding: 10px 20px;
-    margin: 0 10px;
-    cursor: pointer;
-    font-size: 16px;
-    border-radius: 6px;
+.scrub { display:flex; align-items:center; gap:10px; margin-top:10px; }
+.scrub span { font-size:12px; color:var(--muted); }
+.progress.thin { height:8px; flex:1; border:1px solid #2a2a2a; background:#0d0d0d; border-radius:999px; overflow:hidden; }
+.progress .bar { height:100%; background:#f2f2f2; }
+
+/* Side-by-side: controls (2/3) + presets (1/3) */
+.controls { grid-column: 1 / span 1; }
+.presets { grid-column: 2 / span 1; }
+
+/* Drag & Drop + Files: full width rows */
+.drop-panel, .files-panel { grid-column: 1 / -1; }
+
+/* Preset buttons equal width */
+.preset-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; }
+.preset-grid .btn { width: 100%; white-space: normal; text-align: center; }
+
+/* Buttons / Links */
+.btn {
+  background: rgba(255,255,255,.08); color: var(--text);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 12px; padding: 8px 12px; cursor: pointer; font-size: 14px;
 }
+.btn:hover { background: rgba(255,255,255,.15); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
 
-button:hover {
-    background: #5c6bc0;
+.link { background: transparent; border: none; color: var(--muted); cursor: pointer; }
+.link:hover { color: var(--text); text-decoration: underline; }
+
+/* Sliders */
+.slider { display:block; margin-bottom:14px; }
+.slider span { display:block; font-size:13px; margin-bottom:6px; color:#d0d0d0; }
+.slider input[type="range"]{ width:100%; }
+.slider small{ color: var(--muted); }
+
+/* Dropzone */
+.dropzone {
+  text-align:center; padding:24px;
+  border:2px dashed rgba(255,255,255,.2); border-radius:16px;
+  min-height: 140px; display:flex; flex-direction:column; justify-content:center; gap:6px;
 }
+.dropzone.hover { border-color: rgba(255,255,255,.8); background: rgba(255,255,255,.06); }
+.muted { color: var(--muted); }
 
-#dropzone {
-    position: fixed;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-    width: 60%;
-    padding: 20px;
-    border: 2px dashed #555;
-    border-radius: 12px 12px 0 0;
-    background: #1a1a1a;
-    cursor: pointer;
-    transition: 0.3s;
+/* Files */
+.files-header { display:flex; align-items:center; justify-content:space-between; }
+.file-list { display:flex; flex-direction:column; gap:8px; }
+.file {
+  display:flex; align-items:center; justify-content:space-between;
+  background:#111; border:1px solid #222; border-radius:12px; padding:10px;
 }
+.file .meta { display:flex; align-items:center; gap:10px; }
+.file .name { font-size:14px; max-width: 42ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.file .size { font-size:12px; color: var(--muted); }
+.file .actions { display:flex; align-items:center; gap:8px; flex-wrap: wrap; }
 
-#dropzone.hover {
-    background: #2a2a2a;
-    border-color: #999;
-}  
-
-
-#nowPlaying {
-    margin: 20px 0;
-    font-size: 18px;
-    color: #ccc;
+/* ========== Sticky Export Progress (stacked under top bar) ========== */
+.progress-fixed {
+  position: fixed;
+  top: var(--topbar-h);
+  left: 0; right: 0;
+  z-index: 9999;
+  padding: 14px 20px; /* equal, a touch larger for breathing room */
+  background: rgba(10,10,10,0.78);
+  backdrop-filter: saturate(140%) blur(6px);
+  border-bottom: 1px solid #222;
+  transition: transform .25s ease, opacity .25s ease;
 }
+.progress-fixed.hidden { transform: translateY(-10px); opacity: 0; pointer-events: none; }
+.progress-inner { max-width: 1240px; margin: 0 auto; display:flex; flex-direction:column; gap:10px; }
+.progress { width:100%; height:10px; background:#0d0d0d; border-radius:999px; overflow:hidden; border:1px solid #2a2a2a; }
+.bar { height:100%; background: #f2f2f2; }
+.progress-inner .muted { margin: 0; text-align: center; }
 
-#waveformCanvas {
-    width: 1000px;
-    height: 150px;
-    background: #222;
-    margin: 20px auto;
-    border-radius: 10px;
-    display: block;
+/* Responsive */
+@media (max-width: 840px) {
+  .container { grid-template-columns: 1fr; }
+  .controls, .presets, .drop-panel, .files-panel { grid-column: 1 / span 1; }
 }
-
-.time-display {
-    width: 1000px;
-    margin: 5px auto 20px;
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.9rem;
-    color: #aaa;
-}
-
-.progress-container {
-    width: 1000px;
-    margin: 20px auto 0;
-    position: relative;
-}
-
-#progressBar {
-    width: 100%;
-    height: 8px;
-    background: #333;
-    border-radius: 5px;
-    appearance: none;
-    transition: all 0.2s ease;
-    cursor: pointer;
-}  
-
-#progressBar::-webkit-slider-thumb {
-    appearance: none;
-    width: 12px;
-    height: 12px;
-    background: #7f92ff;
-    border-radius: 50%;
-    cursor: pointer;
-    margin-top: -2px;
-}
-
-#progressBar::-moz-range-thumb {
-    width: 12px;
-    height: 12px;
-    background: #7f92ff;
-    border-radius: 50%;
-    cursor: pointer;
-}
-
-.hover-time {
-    position: absolute;
-    top: 40px;
-    transform: translateX(-50%);
-    background: transparent;
-    font-size: 0.8rem;
-    color: #aaa;
-    visibility: hidden;
-    pointer-events: none;
-}
-
-.preset-buttons {
-    margin-top: 20px;
-}
-
-.preset-buttons button {
-    background: #444;
-    color: #fff;
-    border: none;
-    padding: 8px 16px;
-    margin: 0 5px;
-    cursor: pointer;
-    font-size: 14px;
-    border-radius: 5px;
-}
-
-.preset-buttons button:hover {
-    background: #666;
-}
+.hidden { display:none; }
