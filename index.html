@@ -1,60 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Slowed + Reverb / Nightcore Tool</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Special+Gothic&family=Special+Gothic+Expanded+One&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Slowed + Reverb Studio (Vanilla JS)</title>
+  <link rel="stylesheet" href="./style.css?v=9" />
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js" defer></script>
+  <script src="./app.js?v=9" defer></script>
 </head>
-
 <body>
-    <h1>Slowed + Reverb / Nightcore Tool</h1>
 
-    <div class="preset-buttons">
-        <button id="slowedPreset">Slowed + Reverb</button>
-        <button id="nightcorePreset">Nightcore</button>
-        <button id="defaultPreset">Default</button>
-    </div>  
-    
-    <div id="nowPlaying">Now Playing: None</div>
-    
-    <canvas id="waveformCanvas" width="1000" height="150"></canvas>
-    
-    <div class="progress-container">
-        <input type="range" id="progressBar" min="0" max="100" value="0">
-        <div class="hover-time" id="hoverTime">0:00</div>
-    </div>  
-    
-    <div class="hover-time" id="hoverTime">0:00</div>
-    
-    <div class="time-display">
-        <span id="currentTime">0:00</span>
-        <span id="totalTime">0:00</span>
+  <!-- Sticky, full-width progress (shown only while exporting) -->
+  <section id="progressWrap" class="progress-fixed hidden" aria-live="polite">
+    <div class="progress-inner">
+      <div class="progress">
+        <div id="progressBar" class="bar" style="width:0%"></div>
+      </div>
+      <p id="progressText" class="muted">Preparing…</p>
     </div>
-    
-    <div id="controls">
-        <div class="button-group">
-            <button id="playButton">Play</button>
-            <button id="stopButton">Stop</button>
+  </section>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">🎧</div>
+      <div>
+        <h1>Slowed + Reverb Studio</h1>
+        <p>Drag & drop · live tweak · individual / batch downloads</p>
+      </div>
+    </div>
+
+    <div class="actions-row">
+      <label class="format">
+        <span>Format:</span>
+        <select id="formatSelect">
+          <option value="mp3">MP3</option>
+          <option value="wav" selected>WAV (fast)</option>
+        </select>
+      </label>
+
+      <label class="format" title="Lower = faster/smaller">
+        <span>MP3 bitrate:</span>
+        <select id="bitrateSelect">
+          <option value="128">128 kbps (fast)</option>
+          <option value="192" selected>192 kbps</option>
+          <option value="256">256 kbps</option>
+          <option value="320">320 kbps (largest)</option>
+        </select>
+      </label>
+
+      <button id="downloadAll" class="btn" disabled>Download All</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Global Player (waveform + progress) -->
+    <section id="playerPanel" class="panel player hidden">
+      <h2 id="nowPlayingTitle" class="now-playing">Now Playing</h2>
+      <canvas id="waveCanvas" width="1200" height="180" class="wave"></canvas>
+      <div class="scrub">
+        <span id="playTime">0:00</span>
+        <div class="progress thin">
+          <div id="playBar" class="bar" style="width:0%"></div>
         </div>
+        <span id="playTotal">0:00</span>
+      </div>
+    </section>
 
-        <label>Speed: <span id="speedValue">1.0</span>x</label>
-        <input type="range" id="speedSlider" min="0.5" max="2.0" step="0.01" value="1.0">
+    <!-- Controls (2/3) -->
+    <section class="panel controls">
+      <h2>Global Controls</h2>
 
-        <label>Pitch Shift (Semitones): <span id="pitchValue">0</span></label>
-        <input type="range" id="pitchSlider" min="-12" max="12" step="1" value="0">
+      <label class="slider">
+        <span>Speed (playbackRate): <b id="rateVal">0.82x</b></span>
+        <input id="rate" type="range" min="0.5" max="1.5" step="0.01" value="0.82" />
+        <small>Slowed ≈ 0.75–0.90 · Default 1.00 · Nightcore &gt; 1.00</small>
+      </label>
 
-        <label>Reverb Amount: <span id="reverbValue">0.0</span></label>
-        <input type="range" id="reverbSlider" min="0" max="1" step="0.01" value="0.0">
-    </div>
+      <label class="slider">
+        <span>Reverb Mix: <b id="mixVal">45%</b></span>
+        <input id="mix" type="range" min="0" max="1" step="0.01" value="0.45" />
+      </label>
 
-    <div id="dropzone">
-        <p>🎵 Drag and drop audio file(s) here 🎵</p>
-    </div>
+      <label class="slider">
+        <span>Reverb Decay: <b id="decayVal">4.2s</b></span>
+        <input id="decay" type="range" min="0.5" max="6" step="0.1" value="4.2" />
+      </label>
+    </section>
 
-<script src="script.js"></script>
+    <!-- Presets (1/3) -->
+    <section class="panel presets">
+      <h2>Presets</h2>
+      <div class="preset-grid">
+        <button id="presetDefault" class="btn">Default</button>
+        <button id="presetSlowed" class="btn">Slowed + Reverb</button>
+        <button id="presetNightcore" class="btn">Nightcore</button>
+        <button id="presetFaded" class="btn">FADED</button>
+      </div>
+    </section>
+
+    <!-- Drag & Drop (full width) -->
+    <section class="panel drop-panel">
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Drop audio files here">
+        <p>Drag & drop audio files here</p>
+        <p class="muted">or</p>
+        <label class="btn">
+          Browse files
+          <input id="fileInput" type="file" accept="audio/*" multiple hidden />
+        </label>
+      </div>
+    </section>
+
+    <!-- Files list (under drop) -->
+    <section class="panel files-panel">
+      <div class="files-header">
+        <h2>Files (<span id="fileCount">0</span>)</h2>
+        <button id="clearAll" class="link" disabled>Clear all</button>
+      </div>
+      <div id="fileList" class="file-list"></div>
+    </section>
+  </main>
 </body>
 </html>
