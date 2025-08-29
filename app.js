@@ -7,12 +7,13 @@ const readFileAsArrayBuffer=(file)=>new Promise((res,rej)=>{const r=new FileRead
 const AUDIO_EXT=new Set([".mp3",".wav",".m4a",".aac",".flac",".ogg",".oga",".opus",".webm",".wma",".aiff",".aif",".caf"]);
 const isAudioLike=(f)=>!!f&&(f.type?.startsWith("audio/")||AUDIO_EXT.has(((f.name||"").toLowerCase().slice(((f.name||"").lastIndexOf(".")))||"")));
 
+/* directory walk (Drag&Drop folders) */
 async function collectFilesFromItems(items){const out=[],prom=[];for(const it of items){if(it.kind==="file"){const e=it.getAsEntry?.()||it.webkitGetAsEntry?.();if(e&&e.isDirectory){prom.push(walkDirectory(e,out))}else{const f=it.getAsFile();if(f)out.push(f)}}}await Promise.all(prom);return out}
 function walkDirectory(dir,out){return new Promise((resolve)=>{const rd=dir.createReader();const read=()=>{rd.readEntries(async(entries)=>{if(!entries.length)return resolve();for(const ent of entries){if(ent.isFile){await new Promise(res=>ent.file((f)=>{out.push(f);res()},()=>res()))}else if(ent.isDirectory){await walkDirectory(ent,out)}}read()},()=>resolve())};read()})}
 
+/* DSP utils */
 function generateImpulseResponse(ctx,duration=3,decay=3){const rate=ctx.sampleRate,len=Math.max(1,Math.floor(rate*Math.max(0.1,duration))),imp=ctx.createBuffer(2,len,rate);
   for(let ch=0;ch<2;ch++){const d=imp.getChannelData(ch);for(let i=0;i<len;i++){d[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay)}}return imp;}
-
 function audioBufferToWav(abuf){const numCh=abuf.numberOfChannels,len=abuf.length*numCh*2+44,buf=new ArrayBuffer(len),view=new DataView(buf),w=(o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i))};
   w(0,"RIFF");view.setUint32(4,36+abuf.length*numCh*2,true);w(8,"WAVE");w(12,"fmt ");view.setUint32(16,16,true);view.setUint16(20,1,true);
   view.setUint16(22,numCh,true);view.setUint32(24,abuf.sampleRate,true);view.setUint32(28,abuf.sampleRate*numCh*2,true);view.setUint16(32,numCh*2,true);view.setUint16(34,16,true);
@@ -46,17 +47,27 @@ let playbackRate=0.82, reverbMix=0.45, reverbDecay=4.2; // default: Slowed + Rev
 const EXPORT_TAIL_SECONDS=0;
 let currentPreset='Slowed + Reverb';
 
-/* player UI state */
-const playerPanel=document.getElementById('playerPanel');
+/* session guard (prevents overlaps/races) */
+let playReqId = 0; // increment for every play/seek; only latest is honored
+
+/* player UI */
 const nowPlayingTitle=document.getElementById('nowPlayingTitle');
 const waveCanvas=document.getElementById('waveCanvas');
 const playBar=document.getElementById('playBar');
 const playTimeEl=document.getElementById('playTime');
 const playTotalEl=document.getElementById('playTotal');
+
 let currentBuffer=null;
-let startedAtCtxTime=0;     // ctx.currentTime when started
-let currentDuration=0;      // stretched duration (seconds)
+let currentItem=null;
+let startedAtCtxTime=0;
+let currentDuration=0;
 let rafId=null;
+
+/* waveform cache */
+let wfBars=null, lastCanvasW=0, lastCanvasH=0;
+
+/* scrubbing gate */
+let allowScrub=false;
 
 /********* DOM refs *********/
 const rate=document.getElementById('rate');
@@ -130,7 +141,15 @@ dropzone.addEventListener('drop',async(e)=>{
   if(!dropped.length)return;addFiles(dropped);
 });
 fileInput.addEventListener('change',(e)=>{if(e.target.files?.length)addFiles(e.target.files);e.target.value=""});
-clearAllBtn.addEventListener('click',()=>{stopAllPreviews();files=[];renderList()});
+clearAllBtn.addEventListener('click', ()=>{
+  stopAllPreviews(false);       // clears UI
+  files = [];
+  renderList();
+  currentBuffer = null;
+  currentItem = null;
+  allowScrub = false;
+  playReqId++;                  // invalidate any pending async work
+});
 
 /********* list UI *********/
 function refreshCounts(){fileCount.textContent=String(files.length);clearAllBtn.disabled=!files.length;downloadAllBtn.disabled=!files.length}
@@ -142,8 +161,7 @@ function addFiles(listLike){
   files=files.concat(mapped);renderList();
   playExclusive(mapped[mapped.length-1]).catch(console.error);
 }
-function renderList(){
-  refreshCounts();fileList.innerHTML='';
+function renderList(){refreshCounts();fileList.innerHTML='';
   for(const it of files){
     const row=document.createElement('div');row.className='file';
     row.innerHTML=`
@@ -158,71 +176,240 @@ function renderList(){
         <button class="btn" data-act="remove">Remove</button>
       </div>`;
     row.querySelector('[data-act="play"]').addEventListener('click',()=>playExclusive(it));
-    row.querySelector('[data-act="stop"]').addEventListener('click',()=>stopPreview(it.id));
+    row.querySelector('[data-act="stop"]').addEventListener('click',()=>stopPreview(it.id,false));
     row.querySelector('[data-act="download"]').addEventListener('click',()=>downloadOne(it));
     row.querySelector('[data-act="remove"]').addEventListener('click',()=>removeItem(it.id));
     fileList.appendChild(row);
   }
+  if (!currentPlayingId) clearPlayerUI();
 }
-function removeItem(id){stopPreview(id);files=files.filter(f=>f.id!==id);renderList()}
+function removeItem(id){
+  const isCurrent = currentItem && currentItem.id === id;
+  stopPreview(id,false);                 // clears UI if current
+  files = files.filter(f=>f.id!==id);
+  if (isCurrent) {                       // removed last played item
+    currentBuffer = null;
+    currentItem = null;
+    allowScrub = false;
+    playReqId++;                         // invalidate any pending async work
+  }
+  renderList();
+}
 
-/********* player / preview *********/
+/********* small utils *********/
 function secondsToClock(s){s=Math.max(0,s|0);const m=(s/60|0),ss=(s%60).toString().padStart(2,"0");return `${m}:${ss}`}
+function isItemInQueue(id){return files.some(f=>f.id===id)}
+
+/********* canvas sizing (crisp) *********/
+function resizeWaveCanvas(){
+  const dpr=window.devicePixelRatio||1;
+  const wCss=Math.max(1,waveCanvas.clientWidth);
+  const hCss=Math.max(1,waveCanvas.clientHeight);
+  const w=Math.floor(wCss*dpr), h=Math.floor(hCss*dpr);
+  if(waveCanvas.width!==w||waveCanvas.height!==h){waveCanvas.width=w;waveCanvas.height=h;}
+  const g=waveCanvas.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+}
+
+/********* placeholder drawing *********/
+function getIdleMessage(){return files.length?'Click Play on a file to preview':'Drop or select a file to start'}
+function drawPlaceholderWave(msg=getIdleMessage()){
+  resizeWaveCanvas();
+  const c=waveCanvas,w=c.clientWidth,h=c.clientHeight,g=c.getContext('2d');
+  g.clearRect(0,0,w,h); g.fillStyle='#111'; g.fillRect(0,0,w,h);
+  g.strokeStyle='#2a2a2a'; g.lineWidth=1; g.beginPath();
+  for(let x=0;x<w;x+=8){const y1=h*.45,y2=h*.55; g.moveTo(x+.5,y1); g.lineTo(x+.5,y2)} g.stroke();
+  g.fillStyle='#8b8b8b'; g.font='14px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'; g.textAlign='center'; g.textBaseline='middle';
+  g.fillText(msg,w/2,h/2);
+}
+
+/********* bar waveform + overlay *********/
+function computeBarData(buffer){
+  const w=waveCanvas.clientWidth,h=waveCanvas.clientHeight;
+  const data=buffer.getChannelData(0);
+  const barWidth=3,gap=2,marginY=8,minBarH=3,radius=2;
+  const color='#2b3a9e',overlay='rgba(255,255,255,.85)';
+  const bars=Math.max(1,Math.floor(w/(barWidth+gap)));
+  const samplesPerBar=Math.max(1,Math.floor(data.length/bars));
+  const usableH=Math.max(1,h-marginY*2);
+  const heights=new Float32Array(bars), yTop=new Float32Array(bars), xs=new Float32Array(bars);
+  for(let i=0;i<bars;i++){
+    const start=i*samplesPerBar,end=Math.min(start+samplesPerBar,data.length);
+    let peak=0; for(let j=start;j<end;j++){const v=Math.abs(data[j]); if(v>peak) peak=v;}
+    const hBar=Math.max(minBarH,peak*usableH);
+    heights[i]=hBar; xs[i]=Math.round(i*(barWidth+gap)+gap*.5); yTop[i]=Math.round((h-hBar)/2);
+  }
+  return {heights,x:xs,yTop,barWidth,gap,radius,color,overlay};
+}
+function fillRoundRect(g,x,y,w,h,r=2){
+  r=Math.min(r,w*.5,h*.5);
+  g.beginPath(); g.moveTo(x+r,y); g.lineTo(x+w-r,y); g.quadraticCurveTo(x+w,y,x+w,y+r);
+  g.lineTo(x+w,y+h-r); g.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  g.lineTo(x+r,y+h); g.quadraticCurveTo(x,y+h,x,y+h-r);
+  g.lineTo(x,y+r); g.quadraticCurveTo(x,y,x+r,y); g.closePath(); g.fill();
+}
+function drawWaveformBase(){
+  if(!wfBars) return;
+  const c=waveCanvas,w=c.clientWidth,h=c.clientHeight,g=c.getContext('2d');
+  g.clearRect(0,0,w,h); g.fillStyle='#1a1a1a'; g.fillRect(0,0,w,h);
+  g.fillStyle=wfBars.color;
+  for(let i=0;i<wfBars.heights.length;i++){fillRoundRect(g,wfBars.x[i],wfBars.yTop[i],wfBars.barWidth,wfBars.heights[i],wfBars.radius)}
+}
+function drawWaveformProgress(frac){
+  if(!wfBars) return;
+  const g=waveCanvas.getContext('2d'); const upto=Math.floor(frac*wfBars.heights.length);
+  g.fillStyle=wfBars.overlay;
+  for(let i=0;i<upto;i++){fillRoundRect(g,wfBars.x[i],wfBars.yTop[i],wfBars.barWidth,wfBars.heights[i],wfBars.radius)}
+}
+function drawWaveform(buffer){
+  resizeWaveCanvas();
+  const w=waveCanvas.clientWidth,h=waveCanvas.clientHeight;
+  if(!wfBars||w!==lastCanvasW||h!==lastCanvasH){wfBars=computeBarData(buffer); lastCanvasW=w; lastCanvasH=h;}
+  drawWaveformBase(); // overlay painted by RAF
+}
+
+/********* seeking (no overlap, reset-on-end visuals) *********/
+let isSeeking=false, pendingSeekFrac=0;
+function fracFromPointer(ev){const rect=waveCanvas.getBoundingClientRect();const x=Math.min(Math.max(ev.clientX-rect.left,0),rect.width);return rect.width?(x/rect.width):0}
+function applySeekPreview(frac){
+  if(!currentBuffer) return;
+  pendingSeekFrac=frac; drawWaveformBase(); drawWaveformProgress(frac);
+  const previewSec=frac*currentDuration; playTimeEl.textContent=secondsToClock(previewSec); playBar.style.width=(frac*100)+'%';
+}
+waveCanvas.addEventListener('pointerdown',(e)=>{
+  if(!currentBuffer||!allowScrub) return;
+  waveCanvas.setPointerCapture(e.pointerId);
+  stopAllPreviews(true); // stop audio, keep waveform visible
+  isSeeking=true; applySeekPreview(fracFromPointer(e));
+});
+waveCanvas.addEventListener('pointermove',(e)=>{ if(!isSeeking||!allowScrub) return; applySeekPreview(fracFromPointer(e)); });
+['pointerup','pointercancel','pointerleave'].forEach(evt=>{
+  waveCanvas.addEventListener(evt,()=>{
+    if(!isSeeking) return; isSeeking=false;
+    if(!currentBuffer) return;
+    const req = ++playReqId; // new session for the seeked start
+    startBufferPlayback(currentBuffer,currentItem,pendingSeekFrac*currentDuration,req);
+  },{passive:true});
+});
+
+/********* UI lifecycle *********/
 function updatePlayerUIStart(name,durationSec,buffer){
   nowPlayingTitle.textContent=`Now Playing: ${name}`;
   playTotalEl.textContent=secondsToClock(durationSec);
   playTimeEl.textContent='0:00'; playBar.style.width='0%';
-  playerPanel.classList.remove('hidden');
   currentDuration=durationSec; currentBuffer=buffer;
-  drawWaveform(buffer);
-  if(rafId)cancelAnimationFrame(rafId);
-  const tick=()=>{ if(!ctx||currentPlayingId==null) return;
-    const elapsed = ctx.currentTime - startedAtCtxTime; // real-world time since start
-    const clamped = Math.min(currentDuration, elapsed);
-    playTimeEl.textContent = secondsToClock(clamped);
-    playBar.style.width = (clamped / currentDuration * 100) + '%';
-    if (clamped >= currentDuration) { playBar.style.width = '100%'; return; }
+  wfBars=null; drawWaveform(buffer);
+  if(rafId) cancelAnimationFrame(rafId);
+  const thisReq = playReqId;
+  const tick=()=>{ 
+    if(thisReq!==playReqId) return;        // stale loop → stop
+    if(!ctx||currentPlayingId==null) return;
+    const elapsed=Math.max(0,ctx.currentTime-startedAtCtxTime);
+    const clamped=Math.min(currentDuration,elapsed);
+    const frac=currentDuration? (clamped/currentDuration):0;
+    playTimeEl.textContent=secondsToClock(clamped);
+    playBar.style.width=(frac*100)+'%';
+    drawWaveformBase(); drawWaveformProgress(frac);
+    if(clamped>=currentDuration){ playBar.style.width='100%'; return; }
     rafId=requestAnimationFrame(tick);
   };
   rafId=requestAnimationFrame(tick);
 }
-function clearPlayerUI(){playerPanel.classList.add('hidden');if(rafId)cancelAnimationFrame(rafId);playBar.style.width='0%'}
-function stopPreview(id){if(!playing.has(id))return;try{playing.get(id).src.stop()}catch{} playing.delete(id); if(currentPlayingId===id){currentPlayingId=null; clearPlayerUI();}}
-function stopAllPreviews(){for(const id of Array.from(playing.keys()))stopPreview(id);currentPlayingId=null; clearPlayerUI();}
+function clearPlayerUI(){
+  nowPlayingTitle.textContent='Now Playing';
+  playTimeEl.textContent='0:00';
+  playTotalEl.textContent='0:00';
+  playBar.style.width='0%';
+  if(rafId) cancelAnimationFrame(rafId);
+  wfBars=null; drawPlaceholderWave();
+}
 
-async function playExclusive(item){
-  stopAllPreviews();
+/********* playback control with session guards *********/
+function stopPreview(id,keepUI){
+  const g=playing.get(id);
+  if(g){
+    try{ g.src.onended=null; g.src.stop(0); }catch{}
+    try{ g.src.disconnect(); g.dry.disconnect(); g.wet.disconnect(); }catch{}
+  }
+  playing.delete(id);
+  if(currentPlayingId===id){
+    currentPlayingId=null; allowScrub=false;
+    if(!keepUI) clearPlayerUI();
+  }
+}
+function stopAllPreviews(keepUI){
+  for(const [id,g] of Array.from(playing.entries())){
+    try{ g.src.onended=null; g.src.stop(0); }catch{}
+    try{ g.src.disconnect(); g.dry.disconnect(); g.wet.disconnect(); }catch{}
+    playing.delete(id);
+  }
+  currentPlayingId=null; allowScrub=false;
+  if(!keepUI) clearPlayerUI();
+}
+
+function startBufferPlayback(buf,item,offsetSec=0, reqId=playReqId){
+  // If a newer request exists, abort early
+  if(reqId!==playReqId) return;
+
+  stopAllPreviews(true);
   if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)();
-  const arr=await readFileAsArrayBuffer(item.file);
-  const buf=await ctx.decodeAudioData(arr);
+  // On some browsers, context may be suspended after user gesture changes:
+  if(ctx.state==='suspended'){ ctx.resume().catch(()=>{}); }
+
+  // If a newer request happened during resume, abort
+  if(reqId!==playReqId) return;
+
   const src=ctx.createBufferSource(); src.buffer=buf; src.playbackRate.value=playbackRate;
   const dry=ctx.createGain(); const wet=ctx.createGain(); dry.gain.value=1-reverbMix; wet.gain.value=reverbMix;
   const conv=ctx.createConvolver(); conv.buffer=generateImpulseResponse(ctx,Math.min(6,Math.max(1.5,reverbDecay*1.2)),reverbDecay);
+
   src.connect(dry).connect(ctx.destination); src.connect(conv).connect(wet).connect(ctx.destination);
-  src.onended=()=>{playing.delete(item.id); if(currentPlayingId===item.id){currentPlayingId=null; clearPlayerUI();}};
+
+  src.onended=()=>{ 
+    // If this onended is for a stale session, ignore
+    if(reqId!==playReqId) return;
+    playing.delete(item.id); currentPlayingId=null;
+    if(isItemInQueue(item.id)){              
+      if(rafId) cancelAnimationFrame(rafId);
+      // dormant visuals after completion (seek hidden until interaction)
+      playTimeEl.textContent='0:00';
+      playBar.style.width='0%';
+      drawWaveformBase();
+      allowScrub = true;  // allow scrubbing even after finish
+    }else{                                    
+      clearPlayerUI(); currentBuffer=null; currentItem=null; allowScrub=false;
+    }
+  };
+
+  // If a newer request landed while wiring the graph, abort & disconnect
+  if(reqId!==playReqId){
+    try{ src.disconnect(); dry.disconnect(); wet.disconnect(); }catch{}
+    return;
+  }
+
   playing.set(item.id,{src,dry,wet,convolver:conv});
-  currentPlayingId=item.id;
-  startedAtCtxTime=ctx.currentTime;
-  const stretched = buf.duration / Math.max(0.001, playbackRate);
-  updatePlayerUIStart(item.name, stretched, buf);
-  src.start(0);
+  currentPlayingId=item.id; currentItem=item; allowScrub=true;
+
+  const stretched=buf.duration/Math.max(0.001,playbackRate);
+  updatePlayerUIStart(item.name,stretched,buf);
+
+  const sourceOffset=Math.max(0,Math.min(buf.duration-0.001,offsetSec*playbackRate));
+  startedAtCtxTime=ctx.currentTime-offsetSec;
+  try{ src.start(0,sourceOffset) }catch{ src.start(0) }
 }
 
-/* Draw waveform (mono from left channel) */
-function drawWaveform(buffer){
-  const c=waveCanvas, w=c.width, h=c.height, ctx2=c.getContext('2d');
-  ctx2.clearRect(0,0,w,h);
-  ctx2.fillStyle='#1a1a1a'; ctx2.fillRect(0,0,w,h);
-  const data=buffer.getChannelData(0);
-  const step=Math.ceil(data.length / w);
-  ctx2.strokeStyle='#2b3a9e'; ctx2.lineWidth=1; ctx2.beginPath();
-  for(let x=0;x<w;x++){
-    let min=1, max=-1, start=x*step, end=Math.min(start+step,data.length);
-    for(let i=start;i<end;i++){const v=data[i]; if(v<min)min=v; if(v>max)max=v;}
-    const y1=(1+min)*0.5*h, y2=(1+max)*0.5*h;
-    ctx2.moveTo(x,y1); ctx2.lineTo(x,y2);
+/********* play entry points with session guard *********/
+async function playExclusive(item){
+  const req = ++playReqId; // new session
+  try{
+    if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const arr=await readFileAsArrayBuffer(item.file);
+    if(req!==playReqId) return; // stale
+    const buf=await ctx.decodeAudioData(arr);
+    if(req!==playReqId) return; // stale
+    startBufferPlayback(buf,item,0,req);
+  }catch(e){
+    if(req===playReqId){ console.error(e); }
   }
-  ctx2.stroke();
 }
 
 /********* live controls *********/
@@ -234,14 +421,21 @@ function applyLiveChanges(){
   }
   updatePresetNameFromSliders();
 }
-rate.addEventListener('input',e=>{playbackRate=parseFloat(e.target.value);rateVal.textContent=playbackRate.toFixed(2)+'x';applyLiveChanges()});
+rate.addEventListener('input',e=>{
+  playbackRate=parseFloat(e.target.value); rateVal.textContent=playbackRate.toFixed(2)+'x';
+  if(currentPlayingId && currentBuffer && currentItem && ctx){
+    const elapsed=Math.max(0,ctx.currentTime-startedAtCtxTime);
+    const req = ++playReqId;
+    startBufferPlayback(currentBuffer,currentItem,elapsed,req); // keep same visual time
+  }
+});
 mix.addEventListener('input',e=>{reverbMix=parseFloat(e.target.value);mixVal.textContent=Math.round(reverbMix*100)+'%';applyLiveChanges()});
 decay.addEventListener('input',e=>{reverbDecay=parseFloat(e.target.value);decayVal.textContent=reverbDecay.toFixed(1)+'s';applyLiveChanges()});
 
 /********* downloads *********/
 downloadAllBtn.addEventListener('click',downloadAll);
 async function downloadAll(){
-  if(!files.length)return;
+  if(!files.length) return;
   const fmt=(formatSelect?.value||'wav').toLowerCase();
   const kbps=Number(bitrateSelect?.value||192);
   showProgress('Starting…');
@@ -291,7 +485,7 @@ async function renderAudioBuffer(file){
   const srcBuf=await tmp.decodeAudioData(arr.slice(0));
   const rate=tmp.sampleRate; await tmp.close();
 
-  const stretched=srcBuf.duration/Math.max(0.05,playbackRate); // output duration
+  const stretched=srcBuf.duration/Math.max(0.05,playbackRate);
   const tail=Math.min(6,Math.max(1.5,reverbDecay*1.2));
   const total=stretched+tail;
 
@@ -310,10 +504,25 @@ async function renderAudioBuffer(file){
   return trimmed;
 }
 
-/********* init: default format + preset *********/
+/********* sticky offsets *********/
+function adjustStickyOffsets(){
+  const header=document.querySelector('.topbar.top-fixed');
+  const h=header? header.getBoundingClientRect().height : 64;
+  document.documentElement.style.setProperty('--topbar-h', `${Math.round(h)}px`);
+}
+(function observeHeaderResize(){
+  const header=document.querySelector('.topbar.top-fixed'); if(!header) return;
+  const ro=new ResizeObserver(()=>{ adjustStickyOffsets(); if(currentBuffer){ wfBars=null; drawWaveform(currentBuffer);} else drawPlaceholderWave(); });
+  ro.observe(header);
+  window.addEventListener('resize',()=>{ adjustStickyOffsets(); if(currentBuffer){ wfBars=null; drawWaveform(currentBuffer);} else drawPlaceholderWave(); });
+})();
+
+/********* init *********/
 (function init(){
   if (formatSelect) formatSelect.value='wav';   // default export WAV
   applyPreset(PRESETS[1]);                      // default preset: Slowed + Reverb
+  adjustStickyOffsets();
+  clearPlayerUI();
 })();
 
 /* tiny self-test */
