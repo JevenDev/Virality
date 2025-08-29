@@ -47,8 +47,8 @@ let playbackRate=0.82, reverbMix=0.45, reverbDecay=4.2; // default: Slowed + Rev
 const EXPORT_TAIL_SECONDS=0;
 let currentPreset='Slowed + Reverb';
 
-/* session guard (prevents overlaps/races) */
-let playReqId = 0; // increment for every play/seek; only latest is honored
+/* session guard */
+let playReqId = 0;
 
 /* player UI */
 const nowPlayingTitle=document.getElementById('nowPlayingTitle');
@@ -66,8 +66,10 @@ let rafId=null;
 /* waveform cache */
 let wfBars=null, lastCanvasW=0, lastCanvasH=0;
 
-/* scrubbing gate */
+/* scrubbing + hover */
 let allowScrub=false;
+let isSeeking=false, pendingSeekFrac=0;
+let hoverActive=false, hoverFrac=0;
 
 /********* DOM refs *********/
 const rate=document.getElementById('rate');
@@ -148,6 +150,7 @@ clearAllBtn.addEventListener('click', ()=>{
   currentBuffer = null;
   currentItem = null;
   allowScrub = false;
+  hoverActive = false; hoverFrac = 0;
   playReqId++;                  // invalidate any pending async work
 });
 
@@ -191,6 +194,7 @@ function removeItem(id){
     currentBuffer = null;
     currentItem = null;
     allowScrub = false;
+    hoverActive = false; hoverFrac = 0;
     playReqId++;                         // invalidate any pending async work
   }
   renderList();
@@ -260,19 +264,37 @@ function drawWaveformProgress(frac){
   g.fillStyle=wfBars.overlay;
   for(let i=0;i<upto;i++){fillRoundRect(g,wfBars.x[i],wfBars.yTop[i],wfBars.barWidth,wfBars.heights[i],wfBars.radius)}
 }
+/* NEW: hover overlay (lighter, below seek) */
+function drawHoverOverlay(frac){
+  if(!wfBars) return;
+  const g=waveCanvas.getContext('2d'); const upto=Math.floor(frac*wfBars.heights.length);
+  g.save();
+  g.globalAlpha = 0.25; // low opacity
+  g.fillStyle = '#ffffff';
+  for(let i=0;i<upto;i++){fillRoundRect(g,wfBars.x[i],wfBars.yTop[i],wfBars.barWidth,wfBars.heights[i],wfBars.radius)}
+  g.restore();
+}
 function drawWaveform(buffer){
   resizeWaveCanvas();
   const w=waveCanvas.clientWidth,h=waveCanvas.clientHeight;
   if(!wfBars||w!==lastCanvasW||h!==lastCanvasH){wfBars=computeBarData(buffer); lastCanvasW=w; lastCanvasH=h;}
-  drawWaveformBase(); // overlay painted by RAF
+  drawWaveformBase(); // overlay painted by RAF or direct calls
+}
+/* NEW: composite renderer used by RAF and hover updates */
+function renderComposite(progressFrac=0){
+  if(!currentBuffer){ drawPlaceholderWave(); return; }
+  drawWaveformBase();
+  if(progressFrac>0) drawWaveformProgress(progressFrac);
+  if(hoverActive && !isSeeking) drawHoverOverlay(hoverFrac);
 }
 
 /********* seeking (no overlap, reset-on-end visuals) *********/
-let isSeeking=false, pendingSeekFrac=0;
 function fracFromPointer(ev){const rect=waveCanvas.getBoundingClientRect();const x=Math.min(Math.max(ev.clientX-rect.left,0),rect.width);return rect.width?(x/rect.width):0}
 function applySeekPreview(frac){
   if(!currentBuffer) return;
-  pendingSeekFrac=frac; drawWaveformBase(); drawWaveformProgress(frac);
+  pendingSeekFrac=frac;
+  // During seek we show the seek overlay (not hover)
+  drawWaveformBase(); drawWaveformProgress(frac);
   const previewSec=frac*currentDuration; playTimeEl.textContent=secondsToClock(previewSec); playBar.style.width=(frac*100)+'%';
 }
 waveCanvas.addEventListener('pointerdown',(e)=>{
@@ -281,10 +303,29 @@ waveCanvas.addEventListener('pointerdown',(e)=>{
   stopAllPreviews(true); // stop audio, keep waveform visible
   isSeeking=true; applySeekPreview(fracFromPointer(e));
 });
-waveCanvas.addEventListener('pointermove',(e)=>{ if(!isSeeking||!allowScrub) return; applySeekPreview(fracFromPointer(e)); });
+waveCanvas.addEventListener('pointermove',(e)=>{
+  if(isSeeking && allowScrub){ applySeekPreview(fracFromPointer(e)); return; }
+  // Hover preview when not seeking
+  if(!currentBuffer) return;
+  hoverActive = true;
+  hoverFrac = fracFromPointer(e);
+  // If playing, approximate progress now; if not, zero
+  const progress = (currentPlayingId && ctx && currentDuration>0)
+    ? Math.min(1, Math.max(0, (ctx.currentTime - startedAtCtxTime) / currentDuration))
+    : 0;
+  renderComposite(progress);
+});
 ['pointerup','pointercancel','pointerleave'].forEach(evt=>{
-  waveCanvas.addEventListener(evt,()=>{
-    if(!isSeeking) return; isSeeking=false;
+  waveCanvas.addEventListener(evt,(e)=>{
+    if(evt==='pointerleave'){ hoverActive=false;
+      // redraw without hover overlay
+      const progress = (currentPlayingId && ctx && currentDuration>0)
+        ? Math.min(1, Math.max(0, (ctx.currentTime - startedAtCtxTime) / currentDuration))
+        : 0;
+      renderComposite(progress);
+    }
+    if(!isSeeking) return;
+    isSeeking=false;
     if(!currentBuffer) return;
     const req = ++playReqId; // new session for the seeked start
     startBufferPlayback(currentBuffer,currentItem,pendingSeekFrac*currentDuration,req);
@@ -308,7 +349,7 @@ function updatePlayerUIStart(name,durationSec,buffer){
     const frac=currentDuration? (clamped/currentDuration):0;
     playTimeEl.textContent=secondsToClock(clamped);
     playBar.style.width=(frac*100)+'%';
-    drawWaveformBase(); drawWaveformProgress(frac);
+    renderComposite(frac);                  // base + progress + (optional) hover
     if(clamped>=currentDuration){ playBar.style.width='100%'; return; }
     rafId=requestAnimationFrame(tick);
   };
@@ -320,10 +361,11 @@ function clearPlayerUI(){
   playTotalEl.textContent='0:00';
   playBar.style.width='0%';
   if(rafId) cancelAnimationFrame(rafId);
-  wfBars=null; drawPlaceholderWave();
+  wfBars=null; hoverActive=false; hoverFrac=0;
+  drawPlaceholderWave();
 }
 
-/********* playback control with session guards *********/
+/********* playback control *********/
 function stopPreview(id,keepUI){
   const g=playing.get(id);
   if(g){
@@ -347,15 +389,10 @@ function stopAllPreviews(keepUI){
 }
 
 function startBufferPlayback(buf,item,offsetSec=0, reqId=playReqId){
-  // If a newer request exists, abort early
   if(reqId!==playReqId) return;
-
   stopAllPreviews(true);
   if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)();
-  // On some browsers, context may be suspended after user gesture changes:
   if(ctx.state==='suspended'){ ctx.resume().catch(()=>{}); }
-
-  // If a newer request happened during resume, abort
   if(reqId!==playReqId) return;
 
   const src=ctx.createBufferSource(); src.buffer=buf; src.playbackRate.value=playbackRate;
@@ -365,22 +402,20 @@ function startBufferPlayback(buf,item,offsetSec=0, reqId=playReqId){
   src.connect(dry).connect(ctx.destination); src.connect(conv).connect(wet).connect(ctx.destination);
 
   src.onended=()=>{ 
-    // If this onended is for a stale session, ignore
     if(reqId!==playReqId) return;
     playing.delete(item.id); currentPlayingId=null;
     if(isItemInQueue(item.id)){              
       if(rafId) cancelAnimationFrame(rafId);
-      // dormant visuals after completion (seek hidden until interaction)
+      // dormant visuals after completion: progress hidden, hover allowed
       playTimeEl.textContent='0:00';
       playBar.style.width='0%';
       drawWaveformBase();
-      allowScrub = true;  // allow scrubbing even after finish
+      allowScrub = true;
     }else{                                    
       clearPlayerUI(); currentBuffer=null; currentItem=null; allowScrub=false;
     }
   };
 
-  // If a newer request landed while wiring the graph, abort & disconnect
   if(reqId!==playReqId){
     try{ src.disconnect(); dry.disconnect(); wet.disconnect(); }catch{}
     return;
@@ -397,15 +432,15 @@ function startBufferPlayback(buf,item,offsetSec=0, reqId=playReqId){
   try{ src.start(0,sourceOffset) }catch{ src.start(0) }
 }
 
-/********* play entry points with session guard *********/
+/********* play entry point *********/
 async function playExclusive(item){
-  const req = ++playReqId; // new session
+  const req = ++playReqId;
   try{
     if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)();
     const arr=await readFileAsArrayBuffer(item.file);
-    if(req!==playReqId) return; // stale
+    if(req!==playReqId) return;
     const buf=await ctx.decodeAudioData(arr);
-    if(req!==playReqId) return; // stale
+    if(req!==playReqId) return;
     startBufferPlayback(buf,item,0,req);
   }catch(e){
     if(req===playReqId){ console.error(e); }
