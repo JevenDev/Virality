@@ -35,14 +35,6 @@ I got tired of sites that paywalled the basic feature of batch downloading more 
 * **Audio:** Web Audio API + custom convolver reverb
 * **Export:** OfflineAudioContext rendering + [JSZip](https://stuk.github.io/jszip/) + [lamejs](https://github.com/zhuker/lamejs)
 * **Storage:** LocalStorage for user presets
-* **Design:** Clean CSS grid layout with dark theme
-
----
-
-### DESIGN NOTES
-* **Font:** System UI stack
-* **Colors:** Custom dark theme (black/grey panels, muted text, accent waveform)
-* **UI:** Sticky top bar, bottom drop-pill, modular panels
 
 ---
 
