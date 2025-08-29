@@ -181,6 +181,29 @@ body {
 }
 .link:hover { color: var(--text); text-decoration: underline; }
 
+/* save preset button variant */
+.btn.btn-alt {
+  background: #1f1f1f;   /* slightly lighter/different grey than other .btn */
+  color: #f2f2f2;
+  border: 1px solid #3a3a3a;
+}
+.btn.btn-alt:hover { filter: brightness(1.1); }
+.user-preset { /* optional: subtle look for user presets */
+  background: #1f1f1f;
+  border: 1px solid #1f1f1f;;
+  border: 1px solid #3a3a3a;
+}
+.user-preset:hover { filter: brightness(1.07); }
+
+.preset-hint {
+  grid-column: 1 / -1;      /* span full width of the grid */
+  font-size: 14px;
+  color: rgb(240, 113, 113);
+  margin-top: 8px;
+  text-align: center;
+  opacity: 0.8;
+}
+
 /* =========================================================
    Files (full width; space outside panel for sticky footer)
    ========================================================= */
@@ -256,7 +279,7 @@ body {
   position: fixed;
   left: 0; right: 0; bottom: 0;
   z-index: 9000;
-  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+  /* padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); */
   background: transparent;
   pointer-events: none;            /* only the pill can interact */
 }
