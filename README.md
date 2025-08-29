@@ -2,6 +2,7 @@
 _BY JEVEN RANDHAWA_
 
 # [See it in action](https://jevendev.github.io/Virality/)
+<img width="1080" height="720" alt="image" src="https://github.com/user-attachments/assets/aaeeec02-6d6f-43b9-a2ba-f54d353f5d9f"/>
 
 ### ABOUT
 Virality is a browser-based tool for editing and exporting audio with the **slowed + reverb** and **nightcore** effects. No installs, no fees, just drag a file in and start tweaking.
