@@ -69,7 +69,12 @@ body {
   border-radius:14px;
 }
 
-.scrub { display:flex; align-items:center; gap:10px; margin-top:10px; }
+.scrub {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top: 4px;  /* reduced from 10px for better balance */
+}
 .scrub span { font-size:12px; color:var(--muted); }
 .progress.thin { height:8px; flex:1; border:1px solid #2a2a2a; background:#0d0d0d; border-radius:999px; overflow:hidden; }
 .progress .bar { height:100%; background:#f2f2f2; }
@@ -141,6 +146,17 @@ body {
 .progress { width:100%; height:10px; background:#0d0d0d; border-radius:999px; overflow:hidden; border:1px solid #2a2a2a; }
 .bar { height:100%; background: #f2f2f2; }
 .progress-inner .muted { margin: 0; text-align: center; }
+
+/* Global Play Button Row */
+.player-controls-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+#globalPlayPause.btn {
+  min-width: 84px;
+  margin-top: 12px;  /* now it will be respected */
+}
 
 /* Responsive */
 @media (max-width: 840px) {

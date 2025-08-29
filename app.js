@@ -57,6 +57,43 @@ const playBar=document.getElementById('playBar');
 const playTimeEl=document.getElementById('playTime');
 const playTotalEl=document.getElementById('playTotal');
 
+/* Global Play/Pause */
+let globalBtn = document.getElementById('globalPlayPause');
+
+function ensureGlobalPlayButton() {
+  // Find the timeline/progress row (parent of the progress bar)
+  const timelineRow = playBar?.parentElement || waveCanvas?.parentElement;
+
+  // Ensure a container row exists under the timeline
+  let row = document.getElementById('playerControlsRow');
+  if (!row) {
+    row = document.createElement('div');
+    row.id = 'playerControlsRow';
+    row.className = 'player-controls-row';
+    if (timelineRow && timelineRow.insertAdjacentElement) {
+      timelineRow.insertAdjacentElement('afterend', row);
+    } else {
+      (waveCanvas?.parentElement || document.body).appendChild(row);
+    }
+  }
+
+  // Create or move the button into that row
+  if (!globalBtn) {
+    globalBtn = document.createElement('button');
+    globalBtn.id = 'globalPlayPause';
+    globalBtn.className = 'btn';
+    globalBtn.textContent = 'Play';
+  } else if (globalBtn.parentElement !== row) {
+    globalBtn.parentElement.removeChild(globalBtn);
+  }
+  row.appendChild(globalBtn);
+}
+
+
+/* pause/resume bookkeeping */
+let isPaused = false;
+let pausedOffsetSec = 0;
+
 let currentBuffer=null;
 let currentItem=null;
 let startedAtCtxTime=0;
@@ -149,9 +186,11 @@ clearAllBtn.addEventListener('click', ()=>{
   renderList();
   currentBuffer = null;
   currentItem = null;
+  isPaused = false; pausedOffsetSec = 0;
   allowScrub = false;
   hoverActive = false; hoverFrac = 0;
   playReqId++;                  // invalidate any pending async work
+  updateGlobalBtn();
 });
 
 /********* list UI *********/
@@ -193,11 +232,13 @@ function removeItem(id){
   if (isCurrent) {                       // removed last played item
     currentBuffer = null;
     currentItem = null;
+    isPaused = false; pausedOffsetSec = 0;
     allowScrub = false;
     hoverActive = false; hoverFrac = 0;
     playReqId++;                         // invalidate any pending async work
   }
   renderList();
+  updateGlobalBtn();
 }
 
 /********* small utils *********/
@@ -264,12 +305,12 @@ function drawWaveformProgress(frac){
   g.fillStyle=wfBars.overlay;
   for(let i=0;i<upto;i++){fillRoundRect(g,wfBars.x[i],wfBars.yTop[i],wfBars.barWidth,wfBars.heights[i],wfBars.radius)}
 }
-/* NEW: hover overlay (lighter, below seek) */
+/* hover overlay */
 function drawHoverOverlay(frac){
   if(!wfBars) return;
   const g=waveCanvas.getContext('2d'); const upto=Math.floor(frac*wfBars.heights.length);
   g.save();
-  g.globalAlpha = 0.25; // low opacity
+  g.globalAlpha = 0.25;
   g.fillStyle = '#ffffff';
   for(let i=0;i<upto;i++){fillRoundRect(g,wfBars.x[i],wfBars.yTop[i],wfBars.barWidth,wfBars.heights[i],wfBars.radius)}
   g.restore();
@@ -278,9 +319,8 @@ function drawWaveform(buffer){
   resizeWaveCanvas();
   const w=waveCanvas.clientWidth,h=waveCanvas.clientHeight;
   if(!wfBars||w!==lastCanvasW||h!==lastCanvasH){wfBars=computeBarData(buffer); lastCanvasW=w; lastCanvasH=h;}
-  drawWaveformBase(); // overlay painted by RAF or direct calls
+  drawWaveformBase();
 }
-/* NEW: composite renderer used by RAF and hover updates */
 function renderComposite(progressFrac=0){
   if(!currentBuffer){ drawPlaceholderWave(); return; }
   drawWaveformBase();
@@ -293,7 +333,6 @@ function fracFromPointer(ev){const rect=waveCanvas.getBoundingClientRect();const
 function applySeekPreview(frac){
   if(!currentBuffer) return;
   pendingSeekFrac=frac;
-  // During seek we show the seek overlay (not hover)
   drawWaveformBase(); drawWaveformProgress(frac);
   const previewSec=frac*currentDuration; playTimeEl.textContent=secondsToClock(previewSec); playBar.style.width=(frac*100)+'%';
 }
@@ -305,11 +344,9 @@ waveCanvas.addEventListener('pointerdown',(e)=>{
 });
 waveCanvas.addEventListener('pointermove',(e)=>{
   if(isSeeking && allowScrub){ applySeekPreview(fracFromPointer(e)); return; }
-  // Hover preview when not seeking
   if(!currentBuffer) return;
   hoverActive = true;
   hoverFrac = fracFromPointer(e);
-  // If playing, approximate progress now; if not, zero
   const progress = (currentPlayingId && ctx && currentDuration>0)
     ? Math.min(1, Math.max(0, (ctx.currentTime - startedAtCtxTime) / currentDuration))
     : 0;
@@ -318,7 +355,6 @@ waveCanvas.addEventListener('pointermove',(e)=>{
 ['pointerup','pointercancel','pointerleave'].forEach(evt=>{
   waveCanvas.addEventListener(evt,(e)=>{
     if(evt==='pointerleave'){ hoverActive=false;
-      // redraw without hover overlay
       const progress = (currentPlayingId && ctx && currentDuration>0)
         ? Math.min(1, Math.max(0, (ctx.currentTime - startedAtCtxTime) / currentDuration))
         : 0;
@@ -349,7 +385,7 @@ function updatePlayerUIStart(name,durationSec,buffer){
     const frac=currentDuration? (clamped/currentDuration):0;
     playTimeEl.textContent=secondsToClock(clamped);
     playBar.style.width=(frac*100)+'%';
-    renderComposite(frac);                  // base + progress + (optional) hover
+    renderComposite(frac);
     if(clamped>=currentDuration){ playBar.style.width='100%'; return; }
     rafId=requestAnimationFrame(tick);
   };
@@ -375,8 +411,10 @@ function stopPreview(id,keepUI){
   playing.delete(id);
   if(currentPlayingId===id){
     currentPlayingId=null; allowScrub=false;
+    isPaused = false; pausedOffsetSec = 0;
     if(!keepUI) clearPlayerUI();
   }
+  updateGlobalBtn();
 }
 function stopAllPreviews(keepUI){
   for(const [id,g] of Array.from(playing.entries())){
@@ -385,7 +423,8 @@ function stopAllPreviews(keepUI){
     playing.delete(id);
   }
   currentPlayingId=null; allowScrub=false;
-  if(!keepUI) clearPlayerUI();
+  if(!keepUI){ isPaused=false; pausedOffsetSec=0; clearPlayerUI(); }
+  updateGlobalBtn();
 }
 
 function startBufferPlayback(buf,item,offsetSec=0, reqId=playReqId){
@@ -411,9 +450,12 @@ function startBufferPlayback(buf,item,offsetSec=0, reqId=playReqId){
       playBar.style.width='0%';
       drawWaveformBase();
       allowScrub = true;
+      isPaused = false; pausedOffsetSec = 0;
     }else{                                    
       clearPlayerUI(); currentBuffer=null; currentItem=null; allowScrub=false;
+      isPaused = false; pausedOffsetSec = 0;
     }
+    updateGlobalBtn();
   };
 
   if(reqId!==playReqId){
@@ -423,6 +465,7 @@ function startBufferPlayback(buf,item,offsetSec=0, reqId=playReqId){
 
   playing.set(item.id,{src,dry,wet,convolver:conv});
   currentPlayingId=item.id; currentItem=item; allowScrub=true;
+  isPaused = false; pausedOffsetSec = offsetSec || 0;
 
   const stretched=buf.duration/Math.max(0.001,playbackRate);
   updatePlayerUIStart(item.name,stretched,buf);
@@ -430,7 +473,37 @@ function startBufferPlayback(buf,item,offsetSec=0, reqId=playReqId){
   const sourceOffset=Math.max(0,Math.min(buf.duration-0.001,offsetSec*playbackRate));
   startedAtCtxTime=ctx.currentTime-offsetSec;
   try{ src.start(0,sourceOffset) }catch{ src.start(0) }
+
+  updateGlobalBtn();
 }
+
+/********* global play/pause button behavior *********/
+function updateGlobalBtn(){
+  if(!globalBtn) return;
+  globalBtn.textContent = currentPlayingId ? 'Pause' : 'Play';
+}
+globalBtn?.addEventListener('click', ()=>{
+  if(!currentBuffer || !currentItem){
+    // nothing to control yet
+    return;
+  }
+  if(currentPlayingId){
+    // pause
+    if(ctx && currentDuration>0){
+      const elapsed=Math.max(0, ctx.currentTime - startedAtCtxTime);
+      pausedOffsetSec = Math.min(currentDuration, elapsed);
+    }else pausedOffsetSec=0;
+    stopAllPreviews(true); // keep UI
+    isPaused = true;
+    allowScrub = true;
+    updateGlobalBtn();
+  }else{
+    // resume (or start fresh if never started)
+    const req = ++playReqId;
+    const startAt = isPaused ? pausedOffsetSec : 0;
+    startBufferPlayback(currentBuffer, currentItem, startAt, req);
+  }
+});
 
 /********* play entry point *********/
 async function playExclusive(item){
@@ -441,6 +514,7 @@ async function playExclusive(item){
     if(req!==playReqId) return;
     const buf=await ctx.decodeAudioData(arr);
     if(req!==playReqId) return;
+    isPaused=false; pausedOffsetSec=0;
     startBufferPlayback(buf,item,0,req);
   }catch(e){
     if(req===playReqId){ console.error(e); }
@@ -558,6 +632,7 @@ function adjustStickyOffsets(){
   applyPreset(PRESETS[1]);                      // default preset: Slowed + Reverb
   adjustStickyOffsets();
   clearPlayerUI();
+  updateGlobalBtn();
 })();
 
 /* tiny self-test */
