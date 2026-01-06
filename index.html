@@ -2,122 +2,141 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Virality</title>
 
-  <link rel="stylesheet" href="./style.css?v=9" />
+  <link rel="stylesheet" href="./style.css" />
 
-  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script type="module" src="./js/app.js"></script>
 </head>
+
 <body>
+    <!-- background effects -->
+    <canvas id="bg-waves"></canvas>
+    <div class="background-scanlines"></div>
 
-  <!-- Sticky, full-width progress -->
-  <section id="progressWrap" class="progress-fixed hidden" aria-live="polite">
-    <div class="progress-inner">
-      <div class="progress">
-        <div id="progressBar" class="bar" style="width:0%"></div>
-      </div>
-      <p id="progressText" class="muted">Preparing…</p>
-    </div>
-  </section>
-
-  <header class="topbar top-fixed">
-    <div class="brand">
-      <div class="logo">🎧</div>
-      <div><h1>Virality</h1></div>
-    </div>
-
-    <div class="actions-row">
-      <label class="format">
-        <span>Format:</span>
-        <select id="formatSelect">
-          <option value="mp3">MP3</option>
-          <option value="wav" selected>WAV (fast)</option>
-        </select>
-      </label>
-
-      <label class="format" title="Lower = faster/smaller">
-        <span>MP3 bitrate:</span>
-        <select id="bitrateSelect">
-          <option value="128">128 kbps (fast)</option>
-          <option value="192" selected>192 kbps</option>
-          <option value="256">256 kbps</option>
-          <option value="320">320 kbps (largest)</option>
-        </select>
-      </label>
-
-      <button id="downloadAll" class="btn" disabled>Download All</button>
-    </div>
-  </header>
-
-  <main class="container">
-    <section id="playerPanel" class="panel player">
-      <h2 id="nowPlayingTitle" class="now-playing">Now Playing</h2>
-
-      <canvas id="waveCanvas" width="1200" height="180" class="wave"></canvas>
-
-      <div class="scrub">
-        <span id="playTime">0:00</span>
-        <div class="progress thin">
-          <div id="playBar" class="bar" style="width:0%"></div>
+    <div class="psp-container">
+        <div class="waveform-area">
+            <canvas id="visualizer"></canvas>
         </div>
-        <span id="playTotal">0:00</span>
-      </div>
 
-      <div id="playerControlsRow" class="player-controls-row">
-        <button id="globalPlayPause" class="btn">Play</button>
-      </div>
-    </section>
+        <div class="top-controls">
+        <div class="controls-left">
+            <button class="media-btn" title="Previous / Restart" onclick="mediaPrev()" aria-label="Previous">
+                <svg class="icon" viewBox="0 0 64 32" aria-hidden="true">
+                    <rect x="6" y="6" width="4" height="20" rx="1"></rect>
+                    <polygon points="28,6 12,16 28,26"></polygon>
+                    <polygon points="46,6 30,16 46,26"></polygon>
+                </svg>
+            </button>
 
-    <section class="panel controls">
-      <h2>Global Controls</h2>
+            <button class="media-btn" id="master-play" title="Play/Pause" onclick="mediaToggle()" aria-label="Play/Pause">
+                <svg class="icon icon-play" viewBox="0 0 64 32" aria-hidden="true">
+                    <polygon points="22,6 22,26 46,16"></polygon>
+                </svg>
+                <svg class="icon icon-pause" viewBox="0 0 64 32" aria-hidden="true">
+                    <rect x="22" y="6" width="6" height="20" rx="1"></rect>
+                    <rect x="36" y="6" width="6" height="20" rx="1"></rect>
+                </svg>
+            </button>
 
-      <label class="slider">
-        <span>Speed (playbackRate): <b id="rateVal">0.82x</b></span>
-        <input id="rate" type="range" min="0.5" max="1.5" step="0.01" value="0.82" />
-        <small>Slowed ≈ 0.75–0.90 · Default 1.00 · Nightcore &gt; 1.00</small>
-      </label>
+            <button class="media-btn" title="Next" onclick="mediaNext()" aria-label="Next">
+                <svg class="icon" viewBox="0 0 64 32" aria-hidden="true">
+                    <polygon points="18,6 34,16 18,26"></polygon>
+                    <polygon points="36,6 52,16 36,26"></polygon>
+                    <rect x="54" y="6" width="4" height="20" rx="1"></rect>
+                </svg>
+            </button>
+        </div>
 
-      <label class="slider">
-        <span>Reverb Mix: <b id="mixVal">45%</b></span>
-        <input id="mix" type="range" min="0" max="1" step="0.01" value="0.45" />
-      </label>
+        <div class="time-display" id="time-display">0:00 / 0:00</div>
+        </div>
 
-      <label class="slider">
-        <span>Reverb Decay: <b id="decayVal">4.2s</b></span>
-        <input id="decay" type="range" min="0.5" max="6" step="0.1" value="4.2" />
-      </label>
-    </section>
+        <div class="seek-wrap" id="seek-wrap" title="Seek">
+        <div class="seek-track"></div>
+        <div class="seek-fill" id="seek-fill"></div>
+        <div class="seek-notch" id="seek-notch" style="left:0%"></div>
+        </div>
 
-    <section class="panel presets">
-      <h2>Presets</h2>
-      <div class="preset-grid">
-        <button id="presetDefault" class="btn">Default</button>
-        <button id="presetSlowed" class="btn">Slowed + Reverb</button>
-        <button id="presetNightcore" class="btn">Nightcore</button>
-        <button id="presetFaded" class="btn">FADED</button>
-      </div>
-    </section>
+        <div class="now-playing-row">
+        <div class="now-prefix">Now Playing:</div>
+        <div class="title-clip" id="title-clip" aria-label="Track title">
+            <div class="title-track" id="title-track">
+            <div class="title-text" id="title-text">Drop audio to start</div>
+            </div>
+        </div>
+        </div>
 
-    <section class="panel files-panel">
-      <div class="files-header">
-        <h2>Files (<span id="fileCount">0</span>)</h2>
-        <button id="clearAll" class="link" disabled>Clear all</button>
-      </div>
-      <div id="fileList" class="file-list"></div>
-    </section>
-  </main>
+        <div class="glass-panel">
+        <div class="sliders-group">
+            <div class="control-row">
+            <div class="label-row"><span>Speed</span><span id="speed-val">1.0x</span></div>
+            <input type="range" min="0.5" max="1.5" step="0.05" value="1" id="speed-slider">
+            </div>
 
-  <div class="drop-footer">
-    <div class="drop-footer-inner">
-      <div id="dropzone" class="dropzone dropzone-footer" tabindex="0" aria-label="Add audio files">
-        🎵 Drag and drop audio file(s) here 🎵
-      </div>
+            <div class="control-row">
+            <div class="label-row"><span>Reverb Mix</span><span id="mix-val">0%</span></div>
+            <input type="range" min="0" max="1" step="0.05" value="0" id="mix-slider">
+            </div>
+
+            <div class="control-row">
+            <div class="label-row"><span>Reverb Decay</span><span id="decay-val">1.5s</span></div>
+            <input type="range" min="0.5" max="10" step="0.5" value="1.5" id="decay-slider">
+            </div>
+        </div>
+
+        <div class="presets-group" id="presets-group"></div>
+        </div>
+
+        <div class="file-list-panel">
+        <div class="export-controls">
+            <div class="upload-trigger" onclick="document.getElementById('audio-upload').click()">
+            + UPLOAD FILES
+            </div>
+
+            <div class="spacer"></div>
+
+            <select id="export-format" title="Export format">
+            <option value="wav">WAV</option>
+            <option value="mp3">MP3</option>
+            </select>
+
+            <select id="export-bitrate" title="MP3 bitrate">
+            <option value="128">128 kbps</option>
+            <option value="160">160 kbps</option>
+            <option value="192" selected>192 kbps</option>
+            <option value="256">256 kbps</option>
+            <option value="320">320 kbps</option>
+            </select>
+
+            <button class="btn" id="batch-btn" style="padding:10px 12px; font-size:16px;" onclick="batchDownload()">Batch Download</button>
+        </div>
+
+        <div id="file-rows"></div>
+        </div>
+
+        <input type="file" id="audio-upload" accept="audio/*" multiple>
     </div>
-  </div>
 
-  <input id="fileInput" type="file" accept="audio/*" multiple hidden />
+    <div class="export-bar" id="export-bar" aria-live="polite">
+        <div class="export-top">
+        <div class="export-title" id="export-title">Exporting…</div>
+
+        <div style="display:flex; align-items:center; gap:10px;">
+            <button id="export-cancel" class="export-cancel-btn" type="button" disabled>Cancel</button>
+            <div class="export-pct" id="export-pct">0%</div>
+        </div>
+        </div>
+
+        <div class="export-track">
+        <div class="export-fill" id="export-fill"></div>
+        </div>
+    </div>
+
+    <script src="./js/bg-waves.js"></script>
+    <script src="./js/app.js"></script>
+    <script src="./js/export.js"></script>
 </body>
 </html>
