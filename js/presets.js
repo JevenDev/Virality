@@ -7,10 +7,10 @@
     let writable = true;
     let userPresets = load();
     let selectedId = builtins[0].id;
-    let undo = null, preview = null, applying = false, editing = null;
+    let preview = null, editing = null;
     const all = () => [...builtins, ...userPresets];
     const selected = () => all().find(item => item.id === selectedId);
-    const busy = () => PSP.isLoading || PSP.isExporting;
+    const busy = () => PSP.isLoading || PSP.isExporting || PSP.isSessionBusy;
     function load() {
         try {
             const saved = localStorage.getItem(storageKey);
@@ -78,11 +78,6 @@
         };
         PSP.applySettings(preview.settings);
     }
-    function canUndo() {
-        if (!undo) return false;
-        return (undo.editor && PSP.currentIndex < 0 && data.fingerprint(committedSettings()) === undo.after) ||
-            undo.tracks.some(entry => PSP.playlist.includes(entry.track));
-    }
     function sync() {
         if (preview?.track && !PSP.playlist.includes(preview.track)) preview = null;
         const settings = PSP.captureSettings();
@@ -103,21 +98,11 @@
         }
         $('preset-preview-apply').disabled = busy();
         $('preset-preview-undo').disabled = busy();
-        const committed = committedSettings();
-        if (undo && !applying) {
-            const edited = (undo.editor && PSP.currentIndex < 0 && data.fingerprint(committed) !== undo.after) ||
-                undo.tracks.some(entry => PSP.playlist.includes(entry.track) && data.fingerprint(
-                    entry.track === PSP.playlist[PSP.currentIndex] ? committed : entry.track.settings
-                ) !== undo.after);
-            if (edited || !canUndo()) undo = null;
-        }
         $('presets-list').querySelectorAll('button').forEach(button => { button.disabled = busy(); });
         const item = selected();
         const isUser = userPresets.some(preset => preset.id === selectedId);
         $('presets-apply').disabled = !item || busy();
         $('presets-apply-all').disabled = !item || !PSP.playlist.length || busy();
-        $('presets-undo').disabled = Boolean(preview) || !canUndo() || busy();
-        $('presets-undo').title = canUndo() ? 'Restore settings from before the last preset application' : 'Available after applying a preset, until those settings are edited';
         $('presets-update').disabled = Boolean(preview) || !isUser || !writable || busy() || data.fingerprint(item.settings) === data.fingerprint(settings);
         for (const id of ['presets-edit', 'presets-delete']) $(id).disabled = preview?.settings.presetId === selectedId || !isUser || !writable;
         $('presets-duplicate').disabled = !item || !writable;
@@ -223,14 +208,11 @@
         PSP.saveCurrentSettings();
         reveal(id);
     }
-    function commitSound(settings, tracks, before, editor) {
-        const previous = tracks.map(track => ({ track, settings: structuredClone(track.settings) }));
-        applying = true;
-        try {
+    function commitSound(settings, tracks, editor) {
+        PSP.history.transaction('apply preset', () => {
             tracks.forEach(track => { track.settings = structuredClone(settings); });
             if (editor || tracks.includes(currentTrack())) PSP.applySettings(settings);
-            undo = { tracks: previous, editor, before, after: data.fingerprint(settings) };
-        } finally { applying = false; }
+        });
         PSP.renderList();
     }
     function commitPreview(toAll = false) {
@@ -239,7 +221,7 @@
         returnPreviewFocus();
         preview = null;
         const tracks = toAll ? PSP.playlist : pending.track ? [pending.track] : [];
-        commitSound(pending.settings, tracks, pending.before, !pending.track && PSP.currentIndex < 0);
+        commitSound(pending.settings, tracks, !pending.track && PSP.currentIndex < 0);
         PSP.notify(toAll ? `Applied “${pending.settings.preset}” to ${tracks.length} tracks.` : `Applied “${pending.settings.preset}”.`);
     }
     function applyPreset(item, toAll = false) {
@@ -249,22 +231,8 @@
         PSP.saveCurrentSettings();
         const settings = { ...data.settings(item.settings), preset: item.name, presetId: item.id };
         const tracks = toAll ? PSP.playlist : currentTrack() ? [currentTrack()] : [];
-        commitSound(settings, tracks, PSP.captureSettings(), PSP.currentIndex < 0);
-        PSP.notify(toAll ? `Applied “${item.name}” to ${tracks.length} tracks. Undo is available in Presets.` : `Applied “${item.name}”. Undo is available in Presets.`);
-    }
-    function undoApply() {
-        if (preview || !canUndo() || busy()) return;
-        const previous = undo;
-        undo = null;
-        previous.tracks.forEach(entry => {
-            if (PSP.playlist.includes(entry.track)) entry.track.settings = structuredClone(entry.settings);
-        });
-        const current = previous.tracks.find(entry => entry.track === PSP.playlist[PSP.currentIndex]);
-        if (current) PSP.applySettings(current.settings);
-        else if (previous.editor && PSP.currentIndex < 0) PSP.applySettings(previous.before);
-        PSP.renderList();
-        sync();
-        PSP.notify('Restored the settings from before the preset application.');
+        commitSound(settings, tracks, PSP.currentIndex < 0);
+        PSP.notify(toAll ? `Applied “${item.name}” to ${tracks.length} tracks.` : `Applied “${item.name}”.`);
     }
     function openEditor(mode) {
         const item = selected();
@@ -340,7 +308,6 @@
     });
     $('presets-apply').addEventListener('click', () => applyPreset(selected()));
     $('presets-apply-all').addEventListener('click', () => applyPreset(selected(), true));
-    $('presets-undo').addEventListener('click', undoApply);
     $('presets-search').addEventListener('input', refresh);
     $('presets-filter').addEventListener('change', refresh);
     $('presets-export').addEventListener('click', () => { const item = selected(); if (item) download([item], item.name); });
@@ -371,6 +338,6 @@
     new ResizeObserver(() => {
         document.documentElement.style.setProperty('--preset-preview-height', `${$('preset-preview').getBoundingClientRect().height}px`);
     }).observe($('preset-preview'));
-    PSP.presets = { sync, committedSettings, settingsForTrack };
+    PSP.presets = { sync, committedSettings, settingsForTrack, hasPreview: () => Boolean(preview), resetPreview: () => { preview = null; } };
     refresh();
 })();

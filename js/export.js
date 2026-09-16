@@ -183,7 +183,7 @@
         setTimeout(() => URL.revokeObjectURL(url), 30000);
     }
     async function runExport(tracks, batch) {
-        if (PSP.isExporting || !tracks.length) return;
+        if (PSP.isSessionBusy || PSP.isExporting || !tracks.length) return;
         PSP.saveCurrentSettings();
         const format = PSP.exportFormatEl.value;
         const bitrate = Number(PSP.exportBitrateEl.value);

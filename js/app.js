@@ -63,6 +63,7 @@
                 $('track-detail').textContent = trackMeta(track);
             }
         }
+        PSP.history?.record();
         updateWorkspace();
     };
     function restoreSettings(settings) {
@@ -88,6 +89,8 @@
     };
     function updateWorkspace() {
         PSP.presets?.sync();
+        PSP.history?.sync();
+        PSP.sessions?.sync();
         $('workspace-track').value = PSP.currentIndex < 0 ? '' : String(PSP.currentIndex);
         $('workspace-play').disabled = !PSP.isLoaded;
         $('workspace-play').textContent = PSP.isPlaying ? 'Pause' : 'Play';
@@ -233,13 +236,14 @@
     PSP.renderList = renderList;
 
     function handleFiles(files) {
+        if (PSP.isSessionBusy) return;
         if (PSP.isExporting) { PSP.notify('Wait for the export to finish before adding tracks.'); return; }
         let added = 0, skipped = 0;
         const initialSettings = PSP.currentIndex < 0 ? PSP.committedSettings() : PSP.defaultSettings();
         for (const file of files) {
             if (!file.size || !(file.type.startsWith('audio/') || /\.(mp3|wav|flac|m4a|aac|ogg|opus|aiff?|webm)$/i.test(file.name))) { skipped++; continue; }
             if (PSP.playlist.some(track => track.name === file.name && track.size === file.size && track.modified === file.lastModified)) { skipped++; continue; }
-            PSP.playlist.push({ name: file.name, size: file.size, modified: file.lastModified, url: URL.createObjectURL(file), settings: structuredClone(initialSettings) });
+            PSP.playlist.push({ name: file.name, size: file.size, modified: file.lastModified, file, url: URL.createObjectURL(file), settings: structuredClone(initialSettings) });
             added++;
         }
         renderList();
@@ -273,7 +277,8 @@
         cancelAnimationFrame(frame);
         frame = 0;
     }
-    async function loadTrack(index) {
+    async function loadTrack(index, { autoplay = true, position = 0, buffer: restoredBuffer = null, sessionRestore = false } = {}) {
+        if (PSP.isSessionBusy && !sessionRestore) return;
         const track = PSP.playlist[index];
         if (!track) return;
         PSP.saveCurrentSettings();
@@ -292,9 +297,12 @@
         try {
             await PSP.ensureAudio();
             if (version !== loadVersion) return;
-            const response = await fetch(track.url, { signal });
-            if (!response.ok) throw new Error('Could not read the selected file.');
-            const buffer = await PSP.context.rawContext.decodeAudioData(await response.arrayBuffer());
+            let buffer = restoredBuffer;
+            if (!buffer) {
+                const response = await fetch(track.url, { signal });
+                if (!response.ok) throw new Error('Could not read the selected file.');
+                buffer = await PSP.context.rawContext.decodeAudioData(await response.arrayBuffer());
+            }
             // only the latest selection may replace the shared player buffer
             if (version !== loadVersion) return;
             PSP.player.buffer = buffer;
@@ -306,8 +314,9 @@
             await PSP.processing.ready;
             if (version !== loadVersion) return;
             $('track-detail').textContent = trackMeta(track);
+            PSP.audioOffset = clamp(position, 0, PSP.dur());
             renderList();
-            mediaPlay();
+            if (autoplay) mediaPlay();
         } catch (error) {
             if (version !== loadVersion || error.name === 'AbortError') return;
             PSP.isLoading = false;
@@ -319,7 +328,7 @@
     }
     window.loadTrack = loadTrack;
     function removeTrack(index) {
-        if (PSP.isExporting || index < 0 || index >= PSP.playlist.length) return;
+        if (PSP.isSessionBusy || PSP.isExporting || index < 0 || index >= PSP.playlist.length) return;
         const track = PSP.playlist[index];
         const wasCurrent = index === PSP.currentIndex;
         if (wasCurrent) {
@@ -330,6 +339,7 @@
             PSP.isLoading = false;
             PSP.currentIndex = -1;
             restoreSettings(PSP.defaultSettings());
+            PSP.history?.remember(null, PSP.captureSettings());
             if (PSP.player) PSP.player.buffer.dispose();
             setTitle('Add a track');
             $('track-detail').textContent = 'Adjust speed and reverb, then export.';
@@ -339,8 +349,48 @@
         renderList();
     }
     window.removeTrack = removeTrack;
+    PSP.restoreSession = async (session, audio, decoded) => {
+        const tracks = [];
+        try {
+            session.tracks.forEach((track, index) => {
+                const file = new File([audio[index]], track.name, { type: track.type, lastModified: track.modified });
+                tracks.push({ ...track, settings: structuredClone(track.settings), file, url: URL.createObjectURL(file) });
+            });
+        } catch (error) {
+            tracks.forEach(track => URL.revokeObjectURL(track.url));
+            throw error;
+        }
+        loadVersion++;
+        loadController?.abort();
+        stop();
+        PSP.presets.resetPreview();
+        const previous = PSP.playlist;
+        PSP.playlist = tracks;
+        PSP.currentIndex = -1;
+        PSP.isLoaded = false;
+        PSP.isLoading = false;
+        if (PSP.player) PSP.player.buffer.dispose();
+        restoreSettings(session.editorSettings);
+        $('volume-slider').value = session.volume;
+        updateVolume();
+        PSP.repeat = session.repeat;
+        $('repeat-button').setAttribute('aria-pressed', String(PSP.repeat));
+        PSP.exportFormatEl.value = session.export.format;
+        PSP.exportBitrateEl.value = session.export.bitrate;
+        PSP.exportBitrateEl.hidden = session.export.format !== 'mp3';
+        setTitle('Add a track');
+        $('track-detail').textContent = 'Adjust speed and reverb, then export.';
+        PSP.history.reset();
+        previous.forEach(track => URL.revokeObjectURL(track.url));
+        renderList();
+        if (session.currentIndex >= 0) await loadTrack(session.currentIndex, {
+            autoplay: false, position: session.position, buffer: decoded, sessionRestore: true
+        });
+        location.hash = session.page;
+    };
+
     function mediaPlay() {
-        if (!PSP.isLoaded || PSP.isPlaying) return;
+        if (PSP.isSessionBusy || !PSP.isLoaded || PSP.isPlaying) return;
         if (PSP.audioOffset >= PSP.dur() - .02) PSP.audioOffset = 0;
         PSP.context.resume().catch(() => PSP.notify('Audio is paused by your browser. Press Play to resume.'));
         PSP.startedAt = PSP.context.now();
@@ -481,7 +531,7 @@
     document.fonts.ready.then(updateMarquee);
     for (const id of ['help-button', 'shortcuts-button']) $(id).addEventListener('click', () => $('help-dialog').showModal());
     document.addEventListener('keydown', event => {
-        if (event.ctrlKey || event.metaKey || event.altKey || event.repeat || document.querySelector('dialog[open]') || event.target.closest('input, select, textarea, button, a, [contenteditable="true"]')) return;
+        if (PSP.isSessionBusy || event.ctrlKey || event.metaKey || event.altKey || event.repeat || document.querySelector('dialog[open]') || event.target.closest('input, select, textarea, button, a, [contenteditable="true"]')) return;
         if (event.code === 'Space') { event.preventDefault(); mediaToggle(); }
         else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
             event.preventDefault();
@@ -490,9 +540,6 @@
         } else if (event.key.toLowerCase() === 'm') toggleMute();
         else if (event.key.toLowerCase() === 'r') toggleRepeat();
     });
-    document.querySelectorAll('.xmb-nav a').forEach(link => link.addEventListener('click', () => {
-        document.querySelectorAll('.xmb-nav a').forEach(item => item.classList.toggle('selected', item === link));
-    }));
     function updateClock() {
         const now = new Date();
         $('system-clock').dateTime = now.toISOString();

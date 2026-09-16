@@ -6,19 +6,22 @@
     <meta name="theme-color" content="#07358d">
     <meta name="description" content="A PSP-inspired audio editor for slowed + reverb, nightcore, and local WAV and MP3 exports.">
     <title>Virality · Audio editor</title>
-    <link rel="stylesheet" href="./style.css?v=2.14">
+    <link rel="stylesheet" href="./style.css?v=2.15">
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script defer src="./js/bg-waves.js?v=2.0"></script>
     <script defer src="./js/equalizer.js?v=1.1"></script>
     <script defer src="./js/distortion.js?v=1.0"></script>
     <script defer src="./js/delay.js?v=1.0"></script>
     <script defer src="./js/audio-chain.js?v=1.2"></script>
-    <script defer src="./js/app.js?v=2.8"></script>
+    <script defer src="./js/app.js?v=2.9"></script>
     <script defer src="./js/preset-data.js?v=1.0"></script>
-    <script defer src="./js/presets.js?v=1.1"></script>
+    <script defer src="./js/history.js?v=1.0"></script>
+    <script defer src="./js/presets.js?v=1.2"></script>
+    <script defer src="./js/session-data.js?v=1.0"></script>
+    <script defer src="./js/sessions.js?v=1.0"></script>
     <script defer src="./js/loudness-worker.js?v=1.1"></script>
     <script defer src="./js/loudness.js?v=1.1"></script>
-    <script defer src="./js/export.js?v=2.2"></script>
+    <script defer src="./js/export.js?v=2.3"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
     <script defer src="./js/dock.js?v=2.6"></script>
 </head>
@@ -60,10 +63,11 @@
         <section class="workspace" aria-label="Current track">
             <div class="workspace-toolbar"><div class="workspace-track"><label for="workspace-track">Editing</label><select id="workspace-track" aria-label="Track to edit"><option value="">No track selected</option></select></div><button class="btn" id="workspace-play" aria-label="Play selected track" disabled>Play</button><button class="btn" id="workspace-add">Add audio</button><div class="workspace-export"><label for="export-format">Export as</label><select id="export-format"><option value="wav">WAV</option><option value="mp3">MP3</option></select><select id="export-bitrate" aria-label="MP3 bitrate" hidden><option value="128">128 kbps</option><option value="160">160 kbps</option><option value="192" selected>192 kbps</option><option value="256">256 kbps</option><option value="320">320 kbps</option></select><button class="btn" id="workspace-export" disabled>Export track</button></div></div>
             <div class="workspace-effects"><span>Effects</span><div id="workspace-chain" aria-label="Processing order"><span>Original sound</span></div></div>
+            <div class="workspace-actions"><div class="history-actions" role="group" aria-label="Sound edit history"><button class="btn" id="history-undo" disabled>Undo</button><button class="btn" id="history-redo" disabled>Redo</button></div><div class="session-actions" role="group" aria-label="Session files"><button class="btn" id="session-save">Save session</button><button class="btn" id="session-open">Open session</button></div></div>
+            <p id="session-status" role="status"></p>
         </section>
         <main class="page-stack">
             <section class="tool-page" id="music-page" role="tabpanel" aria-labelledby="dock-music">
-                <nav class="xmb-nav" aria-label="Editor sections"><a href="#player" class="selected"><svg class="icon"><use href="#i-music"/></svg><span>Music</span></a><a href="#effects"><svg class="icon"><use href="#i-sliders"/></svg><span>Effects</span></a><a href="#library"><svg class="icon"><use href="#i-library"/></svg><span>Library</span></a></nav>
                 <div class="editor-layout">
                     <section class="player" id="player" aria-labelledby="title-text" tabindex="-1">
                         <div class="section-heading"><span id="playback-state">Audio player</span><span id="track-position">No track selected</span></div>
@@ -98,7 +102,7 @@
             </section>
             <section class="tool-page presets-page" id="presets" role="tabpanel" aria-labelledby="dock-presets" hidden inert>
                 <div class="presets-heading"><h1>Presets</h1><div class="presets-toolbar"><button class="btn" id="presets-import">Import</button><button class="btn" id="presets-export-all">Export my presets</button><button class="btn primary" id="presets-save">Save current sound</button></div></div>
-                <div class="presets-current-row"><p id="presets-current">Current sound: Default</p><button class="text-button" id="presets-undo" disabled>Undo preset application</button></div>
+                <div class="presets-current-row"><p id="presets-current">Current sound: Default</p></div>
                 <div class="presets-layout">
                     <div class="presets-browser">
                         <label for="presets-search">Search presets</label><input id="presets-search" type="search" placeholder="Name, description, or effect" autocomplete="off">
@@ -210,7 +214,9 @@
     <div class="export-bar" id="export-bar" hidden><div class="export-top"><span id="export-title" role="status">Exporting…</span><span id="export-pct">0%</span><button id="export-cancel" class="btn" disabled>Cancel</button></div><div class="export-track" id="export-progress" role="progressbar" aria-label="Export progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="export-fill"></div></div></div>
     <dialog id="preset-dialog" aria-labelledby="preset-dialog-title"><form id="preset-form"><h2 id="preset-dialog-title">Save current sound</h2><p>Includes speed, reverb, EQ, delay, and distortion settings.</p><label for="preset-input">Preset name</label><input id="preset-input" maxlength="80" required autocomplete="off" placeholder="Late night"><label for="preset-description-input">Description (optional)</label><textarea id="preset-description-input" maxlength="240" rows="3" placeholder="What does this sound work well for?"></textarea><p id="preset-dialog-error" role="alert"></p><div class="dialog-actions"><button type="button" class="btn" id="preset-cancel">Cancel</button><button type="submit" class="btn primary">Save preset</button></div></form></dialog>
     <dialog id="preset-delete-dialog" aria-labelledby="preset-delete-title"><h2 id="preset-delete-title">Delete preset</h2><p id="preset-delete-name"></p><div class="dialog-actions"><button type="button" class="btn" id="preset-delete-cancel" autofocus>Cancel</button><button type="button" class="btn" id="preset-delete-confirm">Delete preset</button></div></dialog>
-    <dialog id="help-dialog" aria-labelledby="help-title"><h2 id="help-title">Keyboard shortcuts</h2><dl><div><dt>Cycle tools (dock focused)</dt><dd><kbd>↑</kbd> <kbd>↓</kbd></dd></div><div><dt>Play / pause</dt><dd><kbd>Space</kbd></dd></div><div><dt>Seek 5 seconds</dt><dd><kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Previous / next track</dt><dd><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Mute preview</dt><dd><kbd>M</kbd></dd></div><div><dt>Repeat track</dt><dd><kbd>R</kbd></dd></div></dl><p>Speed also changes pitch. Preview volume does not affect exports.</p><form method="dialog"><button class="btn primary">Got it</button></form></dialog>
+    <input type="file" id="session-upload" accept=".virality" hidden>
+    <dialog id="session-dialog" aria-labelledby="session-dialog-title"><h2 id="session-dialog-title">Open session</h2><p id="session-summary"></p><p>This replaces your current tracks and sound settings. Your saved presets stay in this browser.</p><p id="session-error" role="alert"></p><button type="button" class="text-button" id="session-backup">Save current session first</button><div class="dialog-actions"><button type="button" class="btn" id="session-cancel">Cancel</button><button type="button" class="btn primary" id="session-confirm">Open session</button></div></dialog>
+    <dialog id="help-dialog" aria-labelledby="help-title"><h2 id="help-title">Keyboard shortcuts</h2><dl><div><dt>Undo / redo sound edits</dt><dd><kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></dd></div><div><dt>Cycle tools (dock focused)</dt><dd><kbd>↑</kbd> <kbd>↓</kbd></dd></div><div><dt>Play / pause</dt><dd><kbd>Space</kbd></dd></div><div><dt>Seek 5 seconds</dt><dd><kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Previous / next track</dt><dd><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Mute preview</dt><dd><kbd>M</kbd></dd></div><div><dt>Repeat track</dt><dd><kbd>R</kbd></dd></div></dl><p>Speed also changes pitch. Preview volume does not affect exports.</p><form method="dialog"><button class="btn primary">Got it</button></form></dialog>
     <noscript><p class="notice">Enable JavaScript to use the audio editor.</p></noscript>
 </body>
 </html>
