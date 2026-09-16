@@ -263,6 +263,9 @@ dd { margin: 0; white-space: nowrap; }
 .soon-heading { font-size: 2rem; margin-bottom: .75rem; }
 .soon-message { font-size: 1rem; color: var(--muted); }
 .return-to-music { margin-top: 2.5rem; text-decoration: underline; text-underline-offset: 4px; }
+@media (min-width: 1740px) {
+    .psp-container { width: calc(100% - 16rem); margin-left: max(16rem, calc((100% - 76rem + 16rem) / 2)); }
+}
 @media (min-width: 641px) and (max-width: 1739px) {
     .psp-container { width: calc(100% - 8rem); margin-left: 8rem; padding-left: 2rem; padding-right: 2rem; }
     .tool-dock { left: .5rem; width: 7rem; }
