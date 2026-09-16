@@ -56,7 +56,9 @@
             audioReady = (async () => {
                 PSP.output = new Tone.Gain({ context: PSP.context, gain: Number($('volume-slider').value) / 100 }).toDestination();
                 PSP.reverb = new Tone.Reverb({ context: PSP.context, decay: Number(PSP.decayS.value), wet: Number(PSP.mixS.value) }).connect(PSP.output);
-                PSP.player = new Tone.Player({ context: PSP.context }).connect(PSP.reverb);
+                PSP.equalizer = PSP.eq.createChain(PSP.context, PSP.eq.snapshot());
+                PSP.equalizer.output.connect(PSP.reverb);
+                PSP.player = new Tone.Player({ context: PSP.context }).connect(PSP.equalizer.input);
                 PSP.analyzer = new Tone.Waveform({ context: PSP.context, size: 256 });
                 PSP.player.connect(PSP.analyzer);
                 await PSP.reverb.ready;
@@ -100,6 +102,7 @@
         $('waveform-idle').hidden = PSP.isLoaded || PSP.isLoading;
         updateTime();
         drawWaveform();
+        document.dispatchEvent(new Event('playbackchange'));
     }
     function updateTime() {
         const duration = PSP.dur();

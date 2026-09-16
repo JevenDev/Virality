@@ -6,11 +6,12 @@
     <meta name="theme-color" content="#07358d">
     <meta name="description" content="A PSP-inspired audio editor for slowed + reverb, nightcore, and local WAV and MP3 exports.">
     <title>Virality · Audio editor</title>
-    <link rel="stylesheet" href="./style.css?v=2.6">
+    <link rel="stylesheet" href="./style.css?v=2.7">
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script defer src="./js/bg-waves.js?v=2.0"></script>
-    <script defer src="./js/app.js?v=2.1"></script>
-    <script defer src="./js/export.js?v=2.0"></script>
+    <script defer src="./js/equalizer.js?v=1.0"></script>
+    <script defer src="./js/app.js?v=2.2"></script>
+    <script defer src="./js/export.js?v=2.1"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
     <script defer src="./js/dock.js?v=2.5"></script>
 </head>
@@ -81,13 +82,14 @@
                     <div class="export-controls"><p>© JVN 2026</p><div class="export-options"><label for="export-format">Export as</label><select id="export-format"><option value="wav">WAV</option><option value="mp3">MP3</option></select><select id="export-bitrate" aria-label="MP3 bitrate" hidden><option value="128">128 kbps</option><option value="160">160 kbps</option><option value="192" selected>192 kbps</option><option value="256">256 kbps</option><option value="320">320 kbps</option></select><button class="btn primary" id="batch-btn" disabled><svg class="icon"><use href="#i-download"/></svg>Export all</button></div></div>
                 </section>
             </section>
-            <section class="tool-page coming-soon-page" id="equalizer" role="tabpanel" aria-labelledby="dock-equalizer" hidden inert>
-                <div class="coming-soon-content">
-                    <svg class="soon-icon icon" aria-hidden="true"><use href="#i-equalizer"/></svg>
-                    <h1 class="soon-heading">Equalizer</h1>
-                    <p class="soon-message">Coming soon</p>
-                    <button class="text-button return-to-music">Back to music</button>
-                </div>
+            <section class="tool-page eq-page" id="equalizer" role="tabpanel" aria-labelledby="dock-equalizer" hidden inert>
+                <div class="eq-heading"><div class="eq-title"><svg class="icon" aria-hidden="true"><use href="#i-equalizer"/></svg><h1>Equalizer</h1></div><div class="eq-actions"><button class="btn" id="eq-enabled" aria-pressed="true">EQ on</button><button class="text-button" id="eq-reset">Reset EQ</button></div></div>
+                <div class="eq-preview"><div><span class="eq-preview-label">Preview</span><p id="eq-track-name">No track loaded</p></div><button class="btn" id="eq-play" aria-label="Play preview" disabled>Play</button><button class="btn" id="eq-add-audio">Add audio</button></div>
+                <div class="eq-response"><div class="eq-db-axis" aria-hidden="true"><span>+24 dB</span><span>0</span><span>−24 dB</span></div><div class="eq-plot"><svg id="eq-graph" viewBox="0 0 900 240" preserveAspectRatio="none" role="img" aria-label="Equalizer frequency response"><path class="eq-grid" d="M0 0H900 M0 60H900 M0 180H900 M0 240H900 M0 0V240 M210 0V240 M510 0V240 M810 0V240 M900 0V240"/><path class="eq-zero" d="M0 120H900"/><path id="eq-curve" d="M0 120H900"/></svg><div class="eq-frequency-axis" aria-hidden="true"><span>20 Hz</span><span>100</span><span>1k</span><span>10k</span><span>20k</span></div></div></div>
+                <div class="eq-band-heading"><h2>Frequency bands</h2><span>±12 dB</span></div>
+                <div class="eq-bands" id="eq-bands" role="group" aria-label="Equalizer frequency bands"></div>
+                <div class="eq-bottom"><div class="eq-preset-section"><div class="preset-heading"><h2>Presets</h2><span id="eq-preset-name">Flat</span></div><div class="eq-presets" id="eq-presets"></div></div><div class="eq-preamp-section"><div class="label-row"><label for="eq-preamp">Preamp</label><output id="eq-preamp-value" for="eq-preamp">0.0 dB</output></div><input id="eq-preamp" type="range" min="-24" max="6" step="0.5" value="0"><div class="eq-preamp-footer"><span>−24 to +6 dB</span><button class="text-button" id="eq-auto-gain">Auto gain</button></div></div></div>
+                <div class="eq-footnote"><p id="eq-headroom">Applied to playback and exports.</p><span>Double-click a band to reset it.</span></div>
             </section>
             <section class="tool-page coming-soon-page" id="echo" role="tabpanel" aria-labelledby="dock-echo" hidden inert>
                 <div class="coming-soon-content">

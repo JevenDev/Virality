@@ -35,7 +35,7 @@
         PSP.exportFormatEl.disabled = on;
         PSP.exportBitrateEl.disabled = on;
         PSP.batchBtn.disabled = on || !PSP.playlist.length;
-        for (const id of ['add-files', 'browse-files', 'audio-upload']) document.getElementById(id).disabled = on;
+        for (const id of ['add-files', 'browse-files', 'eq-add-audio', 'audio-upload']) document.getElementById(id).disabled = on;
         document.querySelectorAll('.mini[title="Download"], .mini[title="Remove"]').forEach(button => { button.disabled = on; });
         PSP.exportCancelBtn.disabled = !on;
         PSP.exportCancelBtn.textContent = 'Cancel';
@@ -82,11 +82,13 @@
         throwIfCancelled();
         progress(10);
         const tail = settings.mix > 0 ? settings.decay + .01 : 0;
-        let player, reverb;
+        let player, reverb, equalizer;
         try {
             const rendered = await Tone.Offline(async context => {
                 reverb = new Tone.Reverb({ context, decay: settings.decay, wet: settings.mix }).toDestination();
-                player = new Tone.Player({ context, url: audioBuffer }).connect(reverb);
+                equalizer = PSP.eq.createChain(context, settings.eq);
+                equalizer.output.connect(reverb);
+                player = new Tone.Player({ context, url: audioBuffer }).connect(equalizer.input);
                 player.playbackRate = settings.speed;
                 await reverb.ready;
                 throwIfCancelled();
@@ -97,6 +99,7 @@
             return rendered;
         } finally {
             player?.dispose();
+            equalizer?.dispose();
             reverb?.dispose();
         }
     }
@@ -182,7 +185,7 @@
     }
     async function runExport(tracks, batch) {
         if (PSP.isExporting || !tracks.length) return;
-        const settings = { ...PSP.currentSettings(), preset: PSP.currentPresetName, format: PSP.exportFormatEl.value, bitrate: Number(PSP.exportBitrateEl.value) };
+        const settings = { ...PSP.currentSettings(), eq: PSP.eq.snapshot(), preset: PSP.currentPresetName, format: PSP.exportFormatEl.value, bitrate: Number(PSP.exportBitrateEl.value) };
         clearTimeout(hideTimer);
         PSP.exportCancelToken = { cancelled: false };
         setExportingState(true);
