@@ -6,13 +6,14 @@
     <meta name="theme-color" content="#07358d">
     <meta name="description" content="A PSP-inspired audio editor for slowed + reverb, nightcore, and local WAV and MP3 exports.">
     <title>Virality · Audio editor</title>
-    <link rel="stylesheet" href="./style.css?v=2.10">
+    <link rel="stylesheet" href="./style.css?v=2.11">
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script defer src="./js/bg-waves.js?v=2.0"></script>
     <script defer src="./js/equalizer.js?v=1.1"></script>
     <script defer src="./js/distortion.js?v=1.0"></script>
     <script defer src="./js/audio-chain.js?v=1.1"></script>
-    <script defer src="./js/app.js?v=2.4"></script>
+    <script defer src="./js/app.js?v=2.5"></script>
+    <script defer src="./js/loudness.js?v=1.0"></script>
     <script defer src="./js/export.js?v=2.2"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
     <script defer src="./js/dock.js?v=2.5"></script>
@@ -34,6 +35,7 @@
         <symbol id="i-echo" viewBox="0 0 32 32"><path d="M4 13v6M10 10a9 9 0 0 1 0 12M17 6a15 15 0 0 1 0 20M24 2a21 21 0 0 1 0 28"/></symbol>
         <symbol id="i-distortion" viewBox="0 0 32 32"><path d="M2 16h5l4-11 7 22 4-11h8"/></symbol>
         <symbol id="i-compressor" viewBox="0 0 32 32"><path d="M3 8h26M3 24h26M16 2v12m-4-4 4 4 4-4M16 30V18m-4 4 4-4 4 4"/></symbol>
+        <symbol id="i-loudness" viewBox="0 0 32 32"><path d="M5 25V15M12 25V7M19 25V11M26 25V3M3 29h26"/></symbol>
         <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></symbol>
     </svg>
     <nav class="tool-dock" aria-label="Audio tools">
@@ -44,6 +46,7 @@
             <button class="dock-item" id="dock-echo" role="tab" aria-controls="echo" aria-selected="false" tabindex="-1" data-tool="echo"><svg class="icon" aria-hidden="true"><use href="#i-echo"/></svg><span>Echo</span></button>
             <button class="dock-item" id="dock-distortion" role="tab" aria-controls="distortion" aria-selected="false" tabindex="-1" data-tool="distortion"><svg class="icon" aria-hidden="true"><use href="#i-distortion"/></svg><span>Distortion</span></button>
             <button class="dock-item" id="dock-compressor" role="tab" aria-controls="compressor" aria-selected="false" tabindex="-1" data-tool="compressor"><svg class="icon" aria-hidden="true"><use href="#i-compressor"/></svg><span>Compressor</span></button>
+            <button class="dock-item" id="dock-loudness" role="tab" aria-controls="loudness" aria-selected="false" tabindex="-1" data-tool="loudness"><svg class="icon" aria-hidden="true"><use href="#i-loudness"/></svg><span>LUFS</span></button>
         </div>
         <button class="dock-step dock-next" id="dock-next" aria-label="Next tool"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
     </nav>
@@ -125,6 +128,40 @@
                     <p class="soon-message">Coming soon</p>
                     <button class="text-button return-to-music">Back to music</button>
                 </div>
+            </section>
+            <section class="tool-page lufs-page" id="loudness" role="tabpanel" aria-labelledby="dock-loudness" hidden inert>
+                <div class="lufs-heading"><div class="lufs-title"><svg class="icon" aria-hidden="true"><use href="#i-loudness"/></svg><h1>LUFS checker</h1></div><button class="text-button" id="lufs-clear" disabled>Clear results</button></div>
+                <p class="lufs-intro">Measure the loudness of your audio files. Everything stays on your device.</p>
+                <div class="lufs-import">
+                    <svg class="icon" aria-hidden="true"><use href="#i-loudness"/></svg>
+                    <div><h2>Drop audio files here</h2><p>Mono or stereo · Up to 100 MB and 30 minutes per file</p><p>WAV, MP3, FLAC, M4A, OGG and other formats your browser supports.</p></div>
+                    <div class="lufs-import-actions"><button class="btn primary" id="lufs-browse">Choose files</button><button class="text-button" id="lufs-current" disabled>Check selected original</button></div>
+                </div>
+                <p class="lufs-source-note">Checks original files before editor effects. To check an edit, export it and choose the exported file here.</p>
+                <div class="lufs-progress-row"><p id="lufs-status" role="status">Choose audio files to measure.</p><button class="text-button" id="lufs-cancel" hidden>Cancel analysis</button></div>
+                <progress id="lufs-progress" max="100" aria-label="Loudness analysis progress" hidden></progress>
+                <div id="lufs-detail" hidden>
+                    <div class="lufs-result-heading"><h2 id="lufs-name"></h2><p id="lufs-meta"></p></div>
+                    <dl class="lufs-readings">
+                        <div class="lufs-main-reading"><dt>Integrated <span>LUFS</span></dt><dd id="lufs-integrated">N/A</dd></div>
+                        <div><dt>Loudness range <span>LU</span></dt><dd id="lufs-range">N/A</dd></div>
+                        <div><dt>True peak <span>dBTP</span></dt><dd id="lufs-true-peak">N/A</dd></div>
+                        <div><dt>Sample peak <span>dBFS</span></dt><dd id="lufs-sample-peak">N/A</dd></div>
+                    </dl>
+                    <figure class="lufs-chart">
+                        <figcaption><h2>Loudness over time</h2><div class="lufs-legend"><span>Momentary · 400 ms</span><span>Short-term · 3 s</span></div></figcaption>
+                        <div class="lufs-plot-row"><div class="lufs-axis" aria-hidden="true"><span id="lufs-axis-top">0 LUFS</span><span id="lufs-axis-middle">−35</span><span>−70</span></div><div class="lufs-plot"><svg id="lufs-graph" viewBox="0 0 900 220" preserveAspectRatio="none" role="img" aria-label="Loudness over time"><path class="lufs-grid" d="M0 0H900 M0 55H900 M0 110H900 M0 165H900 M0 220H900 M225 0V220 M450 0V220 M675 0V220"/><path id="lufs-momentary"/><path id="lufs-short-term"/></svg><div class="lufs-time-axis" aria-hidden="true"><span>0:00</span><span id="lufs-graph-end">0:00</span></div></div></div>
+                    </figure>
+                    <div class="lufs-maxima"><span>Max momentary: <strong id="lufs-max-momentary">N/A</strong> LUFS</span><span>Max short-term: <strong id="lufs-max-short">N/A</strong> LUFS</span></div>
+                    <p class="lufs-reading-note" id="lufs-reading-note"></p>
+                    <div class="lufs-target-row"><label for="lufs-target">Compare target <span>LUFS</span></label><input id="lufs-target" type="number" min="-70" max="0" step="0.1" value="-14"><p id="lufs-gain"></p></div>
+                </div>
+                <p class="lufs-empty" id="lufs-empty">Your measurements will appear here.</p>
+                <div class="lufs-table-wrap" id="lufs-table-wrap" role="region" aria-label="File loudness measurements" tabindex="0" hidden>
+                    <table class="lufs-table"><caption>File measurements. Select a completed file to view its graph.</caption><thead><tr><th scope="col">File</th><th scope="col">Duration</th><th scope="col">LUFS</th><th scope="col">LRA · LU</th><th scope="col">Peak · dBTP</th><th scope="col">Status</th></tr></thead><tbody id="lufs-rows"></tbody></table>
+                </div>
+                <div class="lufs-footer"><p>BS.1770-4 loudness · EBU Tech 3342 LRA · 4× true peak<br>Files are decoded at 48 kHz for analysis. Browser decoding can affect readings.</p><div><button class="btn" id="lufs-copy" disabled>Copy report</button><button class="btn" id="lufs-download" disabled>Download report</button></div></div>
+                <input type="file" id="lufs-upload" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.aiff,.aif,.webm" multiple hidden>
             </section>
         </main>
         <footer class="site-footer"><button class="text-button" id="shortcuts-button"><kbd>Space</kbd> play / pause <span>· Keyboard shortcuts</span></button></footer>

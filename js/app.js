@@ -238,6 +238,7 @@
         if (!event.dataTransfer.types.includes('Files')) return;
         event.preventDefault();
         dragDepth++;
+        $('drop-overlay').querySelector('h2').textContent = PSP.loudness?.isActive() ? 'Drop to check loudness' : 'Drop to add to your library';
         $('drop-overlay').hidden = false;
     });
     window.addEventListener('dragover', event => { event.preventDefault(); });
@@ -246,7 +247,8 @@
         event.preventDefault();
         dragDepth = 0;
         $('drop-overlay').hidden = true;
-        handleFiles(event.dataTransfer.files);
+        if (PSP.loudness?.isActive()) PSP.loudness.addFiles(event.dataTransfer.files);
+        else handleFiles(event.dataTransfer.files);
     });
     window.addEventListener('blur', () => { dragDepth = 0; $('drop-overlay').hidden = true; });
 

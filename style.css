@@ -434,3 +434,88 @@ dd { margin: 0; white-space: nowrap; }
     .distortion-layout { margin-top: 1.75rem; }
     .distortion-footnote { flex-direction: column; gap: .5rem; }
 }
+
+.lufs-page { padding: 3rem 0 2rem; }
+.lufs-heading, .lufs-title, .lufs-import, .lufs-progress-row, .lufs-footer { display: flex; align-items: center; gap: 1rem; }
+.lufs-heading, .lufs-progress-row, .lufs-footer { justify-content: space-between; }
+.lufs-title .icon { width: 2rem; height: 2rem; }
+.lufs-title h1 { font-size: 1.75rem; letter-spacing: -.6px; }
+.lufs-intro { color: var(--muted); font-size: .75rem; margin-top: .75rem; line-height: 1.8; }
+.lufs-import { padding: 1.75rem 1.25rem; border: 1px dashed var(--line); margin-top: 1.75rem; }
+.lufs-import > .icon { width: 2.5rem; height: 2.5rem; }
+.lufs-import h2 { font-size: .875rem; margin-bottom: .5rem; }
+.lufs-import p, .lufs-source-note, .lufs-reading-note { color: var(--muted); font-size: .625rem; line-height: 1.8; }
+.lufs-import-actions { margin-left: auto; display: flex; flex-direction: column; align-items: center; gap: .5rem; flex: none; }
+.lufs-source-note { margin-top: .75rem; }
+.lufs-progress-row { margin-top: 1rem; min-height: 2rem; font-size: .6875rem; }
+#lufs-status { overflow-wrap: anywhere; }
+#lufs-cancel { flex: none; }
+#lufs-progress { width: 100%; height: .375rem; accent-color: white; display: block; margin-top: .5rem; }
+.lufs-result-heading { margin: 2rem 0 1.25rem; }
+#lufs-name { font-size: 1rem; overflow-wrap: anywhere; }
+#lufs-meta { font-size: .625rem; color: var(--muted); margin-top: .5rem; }
+.lufs-readings { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5rem; margin: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 1.25rem 0; }
+.lufs-readings > div { display: block; padding: 0; border: 0; }
+.lufs-readings dt { font-size: .6875rem; color: var(--muted); }
+.lufs-readings dt span { display: block; font-size: .5625rem; margin-top: .25rem; }
+.lufs-readings dd { font-size: 1.75rem; margin-top: .5rem; font-variant-numeric: tabular-nums; }
+.lufs-readings .lufs-main-reading dd { font-size: 2.25rem; line-height: 1.2; }
+.lufs-chart { margin: 1.75rem 0 0; }
+.lufs-chart figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
+.lufs-chart h2 { font-size: .8125rem; }
+.lufs-legend { display: flex; gap: 1rem; font-size: .5625rem; color: var(--muted); }
+.lufs-legend span { display: flex; align-items: center; gap: .375rem; }
+.lufs-legend span::before { content: ''; width: 1rem; border-top: 1px solid #c5d7f2; }
+.lufs-legend span:last-child::before { border-top: 2px dashed white; }
+.lufs-plot-row { display: flex; gap: .75rem; }
+.lufs-axis { width: 3rem; flex: none; display: flex; flex-direction: column; justify-content: space-between; padding-bottom: 1.5rem; font-size: .5625rem; color: var(--muted); }
+.lufs-plot { flex: 1; min-width: 0; }
+#lufs-graph { display: block; width: 100%; height: 12rem; overflow: hidden; }
+#lufs-graph path { fill: none; vector-effect: non-scaling-stroke; }
+.lufs-grid { stroke: #c7e1ff25; }
+#lufs-momentary { stroke: #c5d7f2; stroke-width: 1; }
+#lufs-short-term { stroke: white; stroke-width: 2; stroke-dasharray: 5 3; }
+.lufs-time-axis { display: flex; justify-content: space-between; height: 1.5rem; padding-top: .5rem; color: var(--muted); font-size: .5625rem; }
+.lufs-maxima { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; color: var(--muted); font-size: .625rem; margin: .75rem 0; }
+.lufs-maxima strong { color: white; font-weight: 400; }
+.lufs-target-row { display: flex; align-items: center; gap: 1rem; border-top: 1px solid var(--line); padding-top: 1.25rem; margin-top: 1.25rem; }
+.lufs-target-row label { font-size: .6875rem; flex: none; }
+.lufs-target-row label span { display: block; color: var(--muted); font-size: .5625rem; margin-top: .25rem; }
+#lufs-target { width: 5rem; flex: none; padding: .5rem; border-radius: 3px; border: 1px solid var(--line); background: #092956; color: white; font-size: .8125rem; }
+#lufs-gain { color: var(--muted); font-size: .625rem; line-height: 1.8; }
+.lufs-empty { padding: 2.5rem 0; text-align: center; color: var(--muted); font-size: .75rem; }
+.lufs-table-wrap { overflow-x: auto; margin-top: 1.75rem; }
+.lufs-table { width: 100%; border-collapse: collapse; font-size: .625rem; }
+.lufs-table caption { text-align: left; color: var(--muted); font-size: .625rem; padding-bottom: .75rem; }
+.lufs-table th, .lufs-table td { text-align: left; border-bottom: 1px solid var(--line); padding: .75rem .5rem; vertical-align: top; }
+.lufs-table th { font-weight: 400; color: var(--muted); white-space: nowrap; }
+.lufs-table td { font-variant-numeric: tabular-nums; }
+.lufs-table td:first-child { min-width: 9rem; width: 35%; }
+.lufs-table td:last-child { min-width: 7rem; }
+.lufs-file { text-align: left; overflow-wrap: anywhere; padding: 0; font-size: inherit; line-height: 1.8; }
+.lufs-file:disabled { opacity: 1; }
+.lufs-selected { background: #ffffff0c; }
+.lufs-file[aria-pressed="true"] { text-decoration: underline; text-underline-offset: 4px; }
+.lufs-footer { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); align-items: flex-start; }
+.lufs-footer p { font-size: .5625rem; line-height: 1.8; color: var(--muted); }
+.lufs-footer > div { display: flex; flex-wrap: wrap; gap: .5rem; flex: none; }
+@media (max-width: 1100px) {
+    .lufs-import { flex-wrap: wrap; }
+    .lufs-import-actions { margin-left: 0; flex-direction: row; }
+    .lufs-footer { flex-direction: column; }
+}
+@media (max-width: 640px) {
+    .lufs-page { padding-top: 1.75rem; }
+    .lufs-title { gap: .5rem; }
+    .lufs-title h1 { font-size: 1.25rem; }
+    .lufs-title .icon { width: 1.5rem; }
+    .lufs-import { padding: 1.25rem 1rem; }
+    .lufs-import > .icon { display: none; }
+    .lufs-import-actions { flex-wrap: wrap; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+    .lufs-readings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .lufs-chart figcaption { align-items: flex-start; flex-direction: column; }
+    .lufs-legend { flex-wrap: wrap; gap: .5rem 1rem; }
+    .lufs-target-row { flex-wrap: wrap; }
+    #lufs-gain { flex-basis: 100%; }
+    #lufs-graph { height: 10rem; }
+}
