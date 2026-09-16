@@ -3,6 +3,7 @@
     const tablist = dock.querySelector('[role="tablist"]');
     const tabs = [...dock.querySelectorAll('[role="tab"]')];
     const pages = tabs.map(tab => document.getElementById(tab.getAttribute('aria-controls')));
+    const stack = document.querySelector('.page-stack');
     const mobile = matchMedia('(max-width: 640px)');
     const compact = matchMedia('(max-width: 1739px)');
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -62,6 +63,8 @@
         arrange(false);
     }
     function settlePages() {
+        stack.style.removeProperty('height');
+        stack.classList.remove('is-transitioning');
         pages.forEach((page, index) => {
             page.hidden = index !== selected;
             page.inert = index !== selected;
@@ -80,6 +83,7 @@
             return;
         }
         const previous = initialized ? selected : -1;
+        const startHeight = stack.getBoundingClientRect().height;
         const direction = previous < 0 || wrap(index - previous) >= 0 ? 1 : -1;
         transition?.kill();
         transition = null;
@@ -104,7 +108,10 @@
             finish();
             return;
         }
+        stack.style.height = `${startHeight}px`;
+        stack.classList.add('is-transitioning');
         transition = gsap.timeline({ onComplete: finish });
+        transition.to(stack, { height: pages[index].offsetHeight, duration: .57, ease: 'power3.inOut' }, 0);
         transition.to(pages[previous], { opacity: 0, y: -direction * 16, duration: .2, ease: 'power2.in' }, 0);
         transition.fromTo(pages[index], { opacity: 0, y: direction * 22 }, { opacity: 1, y: 0, duration: .45, ease: 'power3.out' }, .12);
         const content = pages[index].querySelectorAll('.coming-soon-content > *');

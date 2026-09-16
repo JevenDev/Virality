@@ -249,7 +249,8 @@ dd { margin: 0; white-space: nowrap; }
 .dock-previous { top: 0; }
 .dock-next { bottom: 0; }
 .dock-next .icon { transform: rotate(180deg); }
-.page-stack { display: grid; min-width: 0; }
+.page-stack { display: grid; align-items: start; min-width: 0; overflow-anchor: none; }
+.page-stack.is-transitioning { overflow: clip; }
 .tool-page { grid-area: 1 / 1; min-width: 0; }
 .tool-page[inert] { pointer-events: none; }
 .coming-soon-page { display: grid; place-items: center; min-height: max(38rem, calc(100svh - 12rem)); }
