@@ -6,11 +6,13 @@
     <meta name="theme-color" content="#07358d">
     <meta name="description" content="A PSP-inspired audio editor for slowed + reverb, nightcore, and local WAV and MP3 exports.">
     <title>Virality · Audio editor</title>
-    <link rel="stylesheet" href="./style.css?v=2.0">
+    <link rel="stylesheet" href="./style.css?v=2.3">
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script defer src="./js/bg-waves.js?v=2.0"></script>
-    <script defer src="./js/app.js?v=2.0"></script>
+    <script defer src="./js/app.js?v=2.1"></script>
     <script defer src="./js/export.js?v=2.0"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script defer src="./js/dock.js?v=2.3"></script>
 </head>
 <body>
     <a class="skip-link" href="#player">Skip to player</a>
@@ -25,41 +27,91 @@
         <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
         <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4zM17 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></symbol>
         <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 10V7h15l-3-3m4 10v3H5l3 3M16 10l3-3M8 14l-3 3"/></symbol>
+        <symbol id="i-equalizer" viewBox="0 0 32 32"><path d="M4 8v16M10 4v24M16 10v12M22 6v20M28 12v8"/></symbol>
+        <symbol id="i-echo" viewBox="0 0 32 32"><path d="M4 13v6M10 10a9 9 0 0 1 0 12M17 6a15 15 0 0 1 0 20M24 2a21 21 0 0 1 0 28"/></symbol>
+        <symbol id="i-distortion" viewBox="0 0 32 32"><path d="M2 16h5l4-11 7 22 4-11h8"/></symbol>
+        <symbol id="i-compressor" viewBox="0 0 32 32"><path d="M3 8h26M3 24h26M16 2v12m-4-4 4 4 4-4M16 30V18m-4 4 4-4 4 4"/></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></symbol>
     </svg>
+    <nav class="tool-dock" aria-label="Audio tools">
+        <button class="dock-step dock-previous" id="dock-previous" aria-label="Previous tool"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+        <div class="dock-items" role="tablist" aria-label="Audio tools" aria-orientation="vertical">
+            <button class="dock-item" id="dock-music" role="tab" aria-controls="music-page" aria-selected="true" data-tool="music"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Music</span></button>
+            <button class="dock-item" id="dock-equalizer" role="tab" aria-controls="equalizer" aria-selected="false" tabindex="-1" data-tool="equalizer"><svg class="icon" aria-hidden="true"><use href="#i-equalizer"/></svg><span>Equalizer</span></button>
+            <button class="dock-item" id="dock-echo" role="tab" aria-controls="echo" aria-selected="false" tabindex="-1" data-tool="echo"><svg class="icon" aria-hidden="true"><use href="#i-echo"/></svg><span>Echo</span></button>
+            <button class="dock-item" id="dock-distortion" role="tab" aria-controls="distortion" aria-selected="false" tabindex="-1" data-tool="distortion"><svg class="icon" aria-hidden="true"><use href="#i-distortion"/></svg><span>Distortion</span></button>
+            <button class="dock-item" id="dock-compressor" role="tab" aria-controls="compressor" aria-selected="false" tabindex="-1" data-tool="compressor"><svg class="icon" aria-hidden="true"><use href="#i-compressor"/></svg><span>Compressor</span></button>
+        </div>
+        <button class="dock-step dock-next" id="dock-next" aria-label="Next tool"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+    </nav>
     <div class="psp-container">
         <header class="site-header"><a class="wordmark" href="./" aria-label="Virality home">virality</a><div class="header-right"><time class="system-clock" id="system-clock" aria-label="Current date and time"></time><button id="help-button" class="text-button" aria-label="Keyboard shortcuts">?</button></div></header>
-        <nav class="xmb-nav" aria-label="Editor sections"><a href="#player" class="selected"><svg class="icon"><use href="#i-music"/></svg><span>Music</span></a><a href="#effects"><svg class="icon"><use href="#i-sliders"/></svg><span>Effects</span></a><a href="#library"><svg class="icon"><use href="#i-library"/></svg><span>Library</span></a></nav>
-        <main>
-            <div class="editor-layout">
-                <section class="player" id="player" aria-labelledby="title-text" tabindex="-1">
-                    <div class="section-heading"><span id="playback-state">Audio player</span><span id="track-position">No track selected</span></div>
-                    <div class="now-playing-row"><div class="title-clip" id="title-clip"><div class="title-track" id="title-track"><h1 id="title-text">Add a track</h1></div></div></div>
-                    <p class="track-detail" id="track-detail">Adjust speed and reverb, then export.</p>
-                    <div class="waveform-area"><canvas id="visualizer" aria-hidden="true"></canvas><div class="waveform-idle" id="waveform-idle"><svg class="icon"><use href="#i-music"/></svg></div></div>
-                    <input id="seek-slider" class="seek-slider" type="range" min="0" max="1000" step="1" value="0" aria-label="Playback position" disabled>
-                    <div class="time-row"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
-                    <div class="transport-row"><div class="controls-left">
-                        <button class="media-btn" id="previous-button" title="Previous / restart" aria-label="Previous or restart" disabled><svg viewBox="0 0 24 24" class="icon filled"><path d="M5 5h2v14H5zm14 0v14L8 12z"/></svg></button>
-                        <button class="media-btn master-play" id="master-play" title="Play (Space)" aria-label="Play" disabled><svg class="icon filled icon-play" viewBox="0 0 24 24"><path d="m8 4 13 8-13 8z"/></svg><svg class="icon filled icon-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg></button>
-                        <button class="media-btn" id="next-button" title="Next track" aria-label="Next track" disabled><svg viewBox="0 0 24 24" class="icon filled"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z"/></svg></button>
-                        <button class="media-btn repeat-button" id="repeat-button" title="Repeat track" aria-label="Repeat track" aria-pressed="false"><svg class="icon"><use href="#i-repeat"/></svg></button>
-                    </div><div class="volume-control"><button class="media-btn" id="mute-button" aria-label="Mute" aria-pressed="false"><svg class="icon"><use href="#i-volume"/></svg></button><input type="range" id="volume-slider" min="0" max="100" value="80" aria-label="Preview volume"><output for="volume-slider" id="volume-val">80%</output></div></div>
+        <main class="page-stack">
+            <section class="tool-page" id="music-page" role="tabpanel" aria-labelledby="dock-music">
+                <nav class="xmb-nav" aria-label="Editor sections"><a href="#player" class="selected"><svg class="icon"><use href="#i-music"/></svg><span>Music</span></a><a href="#effects"><svg class="icon"><use href="#i-sliders"/></svg><span>Effects</span></a><a href="#library"><svg class="icon"><use href="#i-library"/></svg><span>Library</span></a></nav>
+                <div class="editor-layout">
+                    <section class="player" id="player" aria-labelledby="title-text" tabindex="-1">
+                        <div class="section-heading"><span id="playback-state">Audio player</span><span id="track-position">No track selected</span></div>
+                        <div class="now-playing-row"><div class="title-clip" id="title-clip"><div class="title-track" id="title-track"><h1 id="title-text">Add a track</h1></div></div></div>
+                        <p class="track-detail" id="track-detail">Adjust speed and reverb, then export.</p>
+                        <div class="waveform-area"><canvas id="visualizer" aria-hidden="true"></canvas><div class="waveform-idle" id="waveform-idle"><svg class="icon"><use href="#i-music"/></svg></div></div>
+                        <input id="seek-slider" class="seek-slider" type="range" min="0" max="1000" step="1" value="0" aria-label="Playback position" disabled>
+                        <div class="time-row"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
+                        <div class="transport-row"><div class="controls-left">
+                            <button class="media-btn" id="previous-button" title="Previous / restart" aria-label="Previous or restart" disabled><svg viewBox="0 0 24 24" class="icon filled"><path d="M5 5h2v14H5zm14 0v14L8 12z"/></svg></button>
+                            <button class="media-btn master-play" id="master-play" title="Play (Space)" aria-label="Play" disabled><svg class="icon filled icon-play" viewBox="0 0 24 24"><path d="m8 4 13 8-13 8z"/></svg><svg class="icon filled icon-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg></button>
+                            <button class="media-btn" id="next-button" title="Next track" aria-label="Next track" disabled><svg viewBox="0 0 24 24" class="icon filled"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z"/></svg></button>
+                            <button class="media-btn repeat-button" id="repeat-button" title="Repeat track" aria-label="Repeat track" aria-pressed="false"><svg class="icon"><use href="#i-repeat"/></svg></button>
+                        </div><div class="volume-control"><button class="media-btn" id="mute-button" aria-label="Mute" aria-pressed="false"><svg class="icon"><use href="#i-volume"/></svg></button><input type="range" id="volume-slider" min="0" max="100" value="80" aria-label="Preview volume"><output for="volume-slider" id="volume-val">80%</output></div></div>
+                    </section>
+                    <section class="effects" id="effects" aria-labelledby="effects-title">
+                        <div class="section-heading"><h2 id="effects-title">Sound settings</h2><button class="text-button" id="reset-effects">Reset</button></div>
+                        <div class="sliders-group">
+                            <div class="control-row"><div class="label-row"><label for="speed-slider">Playback speed</label><output for="speed-slider" id="speed-val">1.00×</output></div><input type="range" min="0.5" max="1.5" step="0.01" value="1" id="speed-slider"><div class="range-labels"><span>0.5×</span><span>1.5×</span></div></div>
+                            <div class="control-row"><div class="label-row"><label for="mix-slider">Reverb mix</label><output for="mix-slider" id="mix-val">0%</output></div><input type="range" min="0" max="1" step="0.01" value="0" id="mix-slider"></div>
+                            <div class="control-row"><div class="label-row"><label for="decay-slider">Reverb decay</label><output for="decay-slider" id="decay-val">2.0s</output></div><input type="range" min="0.5" max="10" step="0.1" value="2" id="decay-slider"></div>
+                        </div>
+                        <div class="preset-heading"><h3>Presets</h3><span id="preset-name">Default</span></div><div class="presets-group" id="presets-group"></div>
+                    </section>
+                </div>
+                <section class="library" id="library" aria-labelledby="library-title">
+                    <div class="library-toolbar"><div class="library-heading"><svg class="icon"><use href="#i-library"/></svg><h2 id="library-title">Your library</h2><span id="track-count">0 tracks</span></div><button class="btn" id="add-files"><svg class="icon"><use href="#i-plus"/></svg>Add audio</button></div>
+                    <div class="empty-library" id="empty-library"><svg class="icon"><use href="#i-music"/></svg><div><h3>Drop audio files here</h3><p>or <button class="inline-button" id="browse-files">browse files</button></p><span>MP3, WAV, FLAC, M4A, OGG &amp; more</span></div></div>
+                    <div id="file-rows" role="list" aria-label="Audio tracks"></div>
+                    <div class="export-controls"><p>© JVN 2026</p><div class="export-options"><label for="export-format">Export as</label><select id="export-format"><option value="wav">WAV</option><option value="mp3">MP3</option></select><select id="export-bitrate" aria-label="MP3 bitrate" hidden><option value="128">128 kbps</option><option value="160">160 kbps</option><option value="192" selected>192 kbps</option><option value="256">256 kbps</option><option value="320">320 kbps</option></select><button class="btn primary" id="batch-btn" disabled><svg class="icon"><use href="#i-download"/></svg>Export all</button></div></div>
                 </section>
-                <section class="effects" id="effects" aria-labelledby="effects-title">
-                    <div class="section-heading"><h2 id="effects-title">Sound settings</h2><button class="text-button" id="reset-effects">Reset</button></div>
-                    <div class="sliders-group">
-                        <div class="control-row"><div class="label-row"><label for="speed-slider">Playback speed</label><output for="speed-slider" id="speed-val">1.00×</output></div><input type="range" min="0.5" max="1.5" step="0.01" value="1" id="speed-slider"><div class="range-labels"><span>0.5×</span><span>1.5×</span></div></div>
-                        <div class="control-row"><div class="label-row"><label for="mix-slider">Reverb mix</label><output for="mix-slider" id="mix-val">0%</output></div><input type="range" min="0" max="1" step="0.01" value="0" id="mix-slider"></div>
-                        <div class="control-row"><div class="label-row"><label for="decay-slider">Reverb decay</label><output for="decay-slider" id="decay-val">2.0s</output></div><input type="range" min="0.5" max="10" step="0.1" value="2" id="decay-slider"></div>
-                    </div>
-                    <div class="preset-heading"><h3>Presets</h3><span id="preset-name">Default</span></div><div class="presets-group" id="presets-group"></div>
-                </section>
-            </div>
-            <section class="library" id="library" aria-labelledby="library-title">
-                <div class="library-toolbar"><div class="library-heading"><svg class="icon"><use href="#i-library"/></svg><h2 id="library-title">Your library</h2><span id="track-count">0 tracks</span></div><button class="btn" id="add-files"><svg class="icon"><use href="#i-plus"/></svg>Add audio</button></div>
-                <div class="empty-library" id="empty-library"><svg class="icon"><use href="#i-music"/></svg><div><h3>Drop audio files here</h3><p>or <button class="inline-button" id="browse-files">browse files</button></p><span>MP3, WAV, FLAC, M4A, OGG &amp; more</span></div></div>
-                <div id="file-rows" role="list" aria-label="Audio tracks"></div>
-                <div class="export-controls"><p>© JVN 2026</p><div class="export-options"><label for="export-format">Export as</label><select id="export-format"><option value="wav">WAV</option><option value="mp3">MP3</option></select><select id="export-bitrate" aria-label="MP3 bitrate" hidden><option value="128">128 kbps</option><option value="160">160 kbps</option><option value="192" selected>192 kbps</option><option value="256">256 kbps</option><option value="320">320 kbps</option></select><button class="btn primary" id="batch-btn" disabled><svg class="icon"><use href="#i-download"/></svg>Export all</button></div></div>
+            </section>
+            <section class="tool-page coming-soon-page" id="equalizer" role="tabpanel" aria-labelledby="dock-equalizer" hidden inert>
+                <div class="coming-soon-content">
+                    <svg class="soon-icon icon" aria-hidden="true"><use href="#i-equalizer"/></svg>
+                    <h1 class="soon-heading">Equalizer</h1>
+                    <p class="soon-message">Coming soon</p>
+                    <button class="text-button return-to-music">Back to music</button>
+                </div>
+            </section>
+            <section class="tool-page coming-soon-page" id="echo" role="tabpanel" aria-labelledby="dock-echo" hidden inert>
+                <div class="coming-soon-content">
+                    <svg class="soon-icon icon" aria-hidden="true"><use href="#i-echo"/></svg>
+                    <h1 class="soon-heading">Echo</h1>
+                    <p class="soon-message">Coming soon</p>
+                    <button class="text-button return-to-music">Back to music</button>
+                </div>
+            </section>
+            <section class="tool-page coming-soon-page" id="distortion" role="tabpanel" aria-labelledby="dock-distortion" hidden inert>
+                <div class="coming-soon-content">
+                    <svg class="soon-icon icon" aria-hidden="true"><use href="#i-distortion"/></svg>
+                    <h1 class="soon-heading">Distortion</h1>
+                    <p class="soon-message">Coming soon</p>
+                    <button class="text-button return-to-music">Back to music</button>
+                </div>
+            </section>
+            <section class="tool-page coming-soon-page" id="compressor" role="tabpanel" aria-labelledby="dock-compressor" hidden inert>
+                <div class="coming-soon-content">
+                    <svg class="soon-icon icon" aria-hidden="true"><use href="#i-compressor"/></svg>
+                    <h1 class="soon-heading">Compressor</h1>
+                    <p class="soon-message">Coming soon</p>
+                    <button class="text-button return-to-music">Back to music</button>
+                </div>
             </section>
         </main>
         <footer class="site-footer"><button class="text-button" id="shortcuts-button"><kbd>Space</kbd> play / pause <span>· Keyboard shortcuts</span></button></footer>
@@ -69,7 +121,7 @@
     <div id="notice" class="notice" role="status" hidden></div>
     <div class="export-bar" id="export-bar" hidden><div class="export-top"><span id="export-title" role="status">Exporting…</span><span id="export-pct">0%</span><button id="export-cancel" class="btn" disabled>Cancel</button></div><div class="export-track" id="export-progress" role="progressbar" aria-label="Export progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="export-fill"></div></div></div>
     <dialog id="preset-dialog" aria-labelledby="preset-dialog-title"><form id="preset-form"><h2 id="preset-dialog-title">Save preset</h2><p>Presets are saved in this browser.</p><label for="preset-input">Preset name</label><input id="preset-input" maxlength="24" required autocomplete="off" placeholder="Late night"><div class="dialog-actions"><button type="button" class="btn" id="preset-cancel">Cancel</button><button type="submit" class="btn primary">Save preset</button></div></form></dialog>
-    <dialog id="help-dialog" aria-labelledby="help-title"><h2 id="help-title">Keyboard shortcuts</h2><dl><div><dt>Play / pause</dt><dd><kbd>Space</kbd></dd></div><div><dt>Seek 5 seconds</dt><dd><kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Previous / next track</dt><dd><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Mute preview</dt><dd><kbd>M</kbd></dd></div><div><dt>Repeat track</dt><dd><kbd>R</kbd></dd></div></dl><p>Speed also changes pitch. Preview volume does not affect exports.</p><form method="dialog"><button class="btn primary">Got it</button></form></dialog>
+    <dialog id="help-dialog" aria-labelledby="help-title"><h2 id="help-title">Keyboard shortcuts</h2><dl><div><dt>Cycle tools (dock focused)</dt><dd><kbd>↑</kbd> <kbd>↓</kbd></dd></div><div><dt>Play / pause</dt><dd><kbd>Space</kbd></dd></div><div><dt>Seek 5 seconds</dt><dd><kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Previous / next track</dt><dd><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Mute preview</dt><dd><kbd>M</kbd></dd></div><div><dt>Repeat track</dt><dd><kbd>R</kbd></dd></div></dl><p>Speed also changes pitch. Preview volume does not affect exports.</p><form method="dialog"><button class="btn primary">Got it</button></form></dialog>
     <noscript><p class="notice">Enable JavaScript to use the audio editor.</p></noscript>
 </body>
 </html>

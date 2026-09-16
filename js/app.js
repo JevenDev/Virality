@@ -440,7 +440,7 @@
 
     function drawWaveform() {
         ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-        if (!PSP.isLoaded) return;
+        if (!PSP.isLoaded || !canvasWidth || !canvasHeight) return;
         const values = PSP.analyzer.getValue();
         ctx.beginPath();
         ctx.strokeStyle = '#eaf6ff';
