@@ -101,9 +101,10 @@
     }
     function measure(buffer, entry, version) {
         return new Promise((resolve, reject) => {
-            const worker = new Worker('./js/loudness-worker.js?v=1.0');
+            const job = PSP.createLoudnessWorker();
+            const worker = job.worker;
             const finish = (error, result) => {
-                worker.terminate();
+                job.dispose();
                 if (activeJob?.worker === worker) activeJob = null;
                 if (error) reject(error); else resolve(result);
             };

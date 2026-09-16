@@ -1,4 +1,4 @@
-(() => {
+(function initializeLoudnessWorker() {
     // 48 kHz K-weighting and 4x true-peak FIR from ITU-R BS.1770-4, Annexes 1 and 2
     const phases = [
         [.001708984375, .010986328125, -.0196533203125, .033203125, -.0594482421875, .1373291015625, .97216796875, -.102294921875, .047607421875, -.026611328125, .014892578125, -.00830078125],
@@ -85,7 +85,20 @@
         };
     }
     if (typeof module !== 'undefined' && module.exports) module.exports = { analyze };
-    else self.onmessage = event => {
+    else if (typeof window !== 'undefined') {
+        const PSP = (window.PSP = window.PSP || {});
+        PSP.createLoudnessWorker = () => {
+            // embed the loaded analyzer because file pages cannot start workers from file URLs
+            const url = URL.createObjectURL(new Blob([`(${initializeLoudnessWorker.toString()})();`], { type: 'text/javascript' }));
+            try {
+                const worker = new Worker(url);
+                return { worker, dispose() { worker.terminate(); URL.revokeObjectURL(url); } };
+            } catch (error) {
+                URL.revokeObjectURL(url);
+                throw error;
+            }
+        };
+    } else self.onmessage = event => {
         try {
             const result = analyze(event.data.channels, event.data.sampleRate, percent => self.postMessage({ percent }));
             self.postMessage({ result });
