@@ -74,6 +74,11 @@
         const peak = Math.max(...frequencyResponse(false));
         state.preamp = Math.max(-24, Math.min(0, -Math.ceil(peak * 2) / 2));
     }
+    const bandX = frequency => Math.log(frequency / 20) / Math.log(1000) * 900;
+    const graphHandleScale = () => {
+        const { width, height } = $('eq-graph').getBoundingClientRect();
+        return width && height ? height * 900 / (width * 240) : 1;
+    };
     function render() {
         $('eq-enabled').setAttribute('aria-pressed', String(state.enabled));
         $('eq-enabled').textContent = state.enabled ? 'EQ on' : 'Bypassed';
@@ -85,6 +90,13 @@
             slider.value = state.gains[index];
             slider.setAttribute('aria-valuetext', formatDb(state.gains[index]));
             $(`eq-value-${index}`).textContent = formatDb(state.gains[index]);
+            const handle = $(`eq-graph-band-${index}`);
+            if (handle) {
+                handle.setAttribute('transform', `translate(${bandX(frequency).toFixed(2)} ${(120 - state.gains[index] * 5).toFixed(2)}) scale(${graphHandleScale().toFixed(4)} 1)`);
+                handle.setAttribute('aria-valuenow', state.gains[index]);
+                handle.setAttribute('aria-valuetext', formatDb(state.gains[index]));
+                handle.classList.toggle('graph-handle-active', state.gains[index] !== 0);
+            }
         });
         $('eq-preamp').value = state.preamp;
         $('eq-preamp').setAttribute('aria-valuetext', formatDb(state.preamp));
@@ -101,6 +113,106 @@
         PSP.saveCurrentSettings();
         render();
     }
+    function setBand(index, gain) {
+        const next = Math.max(-12, Math.min(12, Math.round(gain * 2) / 2));
+        if (next === state.gains[index]) return;
+        state.gains[index] = next;
+        presetName = 'Custom';
+        apply();
+    }
+    function beginGesture(control, index) {
+        document.dispatchEvent(new CustomEvent('soundgesturestart', { detail: { control, label: `EQ ${labels[index]} band` } }));
+    }
+    function endGesture() { document.dispatchEvent(new Event('soundgestureend')); }
+    const graph = $('eq-graph');
+    const graphHandles = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    graphHandles.classList.add('eq-graph-handles');
+    frequencies.forEach((frequency, index) => {
+        const control = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        control.id = `eq-graph-band-${index}`;
+        control.classList.add('graph-control');
+        control.dataset.eqBand = index;
+        control.setAttribute('tabindex', '0');
+        control.setAttribute('role', 'slider');
+        control.setAttribute('aria-label', `${frequency} Hz gain`);
+        control.setAttribute('aria-valuemin', '-12');
+        control.setAttribute('aria-valuemax', '12');
+        control.setAttribute('aria-orientation', 'vertical');
+        const hit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        hit.classList.add('graph-handle-hit');
+        hit.setAttribute('r', '18');
+        const point = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        point.classList.add('graph-handle');
+        point.setAttribute('r', '7');
+        control.append(hit, point);
+        graphHandles.append(control);
+    });
+    graph.append(graphHandles);
+    const graphPoint = event => {
+        const rect = graph.getBoundingClientRect();
+        return { x: (event.clientX - rect.left) / rect.width * 900, y: (event.clientY - rect.top) / rect.height * 240 };
+    };
+    const nearestBand = x => frequencies.reduce((nearest, frequency, index) =>
+        Math.abs(bandX(frequency) - x) < Math.abs(bandX(frequencies[nearest]) - x) ? index : nearest, 0);
+    let draggedBand = null, dragOrigin = null, dragFromHandle = false, dragMoved = false;
+    function updateGraphBand(event) {
+        const { y } = graphPoint(event);
+        setBand(draggedBand, (120 - y) / 5);
+    }
+    graph.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        event.preventDefault();
+        const selected = event.target.closest('[data-eq-band]');
+        dragOrigin = { x: event.clientX, y: event.clientY };
+        dragFromHandle = Boolean(selected);
+        dragMoved = false;
+        draggedBand = selected ? Number(selected.dataset.eqBand) : nearestBand(graphPoint(event).x);
+        const control = $(`eq-graph-band-${draggedBand}`);
+        beginGesture(control, draggedBand);
+        graph.setPointerCapture(event.pointerId);
+        if (!dragFromHandle) updateGraphBand(event);
+    });
+    graph.addEventListener('pointermove', event => {
+        if (draggedBand === null) return;
+        if (Math.hypot(event.clientX - dragOrigin.x, event.clientY - dragOrigin.y) >= 2) dragMoved = true;
+        if (dragMoved) updateGraphBand(event);
+    });
+    function stopGraphDrag(event) {
+        if (draggedBand === null) return;
+        if (event.type === 'pointerup' && (!dragFromHandle || dragMoved)) updateGraphBand(event);
+        const control = $(`eq-graph-band-${draggedBand}`);
+        draggedBand = null;
+        dragOrigin = null;
+        if (graph.hasPointerCapture(event.pointerId)) graph.releasePointerCapture(event.pointerId);
+        endGesture();
+        control.focus({ preventScroll: true });
+    }
+    graph.addEventListener('pointerup', stopGraphDrag);
+    graph.addEventListener('pointercancel', stopGraphDrag);
+    graph.addEventListener('keydown', event => {
+        const control = event.target.closest('[data-eq-band]');
+        if (!control) return;
+        const index = Number(control.dataset.eqBand);
+        const changes = { ArrowUp: .5, ArrowRight: .5, ArrowDown: -.5, ArrowLeft: -.5, PageUp: 2, PageDown: -2 };
+        let value = changes[event.key] === undefined ? null : state.gains[index] + changes[event.key];
+        if (event.key === 'Home') value = -12;
+        if (event.key === 'End') value = 12;
+        if (event.key === '0') value = 0;
+        if (value === null) return;
+        event.preventDefault();
+        beginGesture(control, index);
+        setBand(index, value);
+        endGesture();
+    });
+    graph.addEventListener('dblclick', event => {
+        event.preventDefault();
+        const selected = event.target.closest('[data-eq-band]');
+        const index = selected ? Number(selected.dataset.eqBand) : nearestBand(graphPoint(event).x);
+        const control = $(`eq-graph-band-${index}`);
+        beginGesture(control, index);
+        setBand(index, 0);
+        endGesture();
+    });
     const bands = document.createDocumentFragment();
     frequencies.forEach((frequency, index) => {
         const band = document.createElement('div');
@@ -154,5 +266,6 @@
         apply();
     });
     document.addEventListener('playbackchange', render);
+    new ResizeObserver(render).observe(graph);
     render();
 })();

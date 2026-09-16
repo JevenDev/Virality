@@ -12,6 +12,12 @@
     const gain = db => 10 ** (db / 20);
     const formatDb = db => `${db > 0 ? '+' : ''}${db.toFixed(1)} dB`;
     const toneFrequency = (frequency, context) => Math.min(frequency, context.sampleRate * .45);
+    const graphInput = .1;
+    const graphX = 264;
+    const graphHandleScale = () => {
+        const { width, height } = $('distortion-graph').getBoundingClientRect();
+        return width && height ? height * 480 / (width * 280) : 1;
+    };
 
     function createChain(context, settings) {
         const amount = settings.enabled ? settings.mix : 0;
@@ -72,6 +78,13 @@
             return `${i ? 'L' : 'M'}${i * 2},${(140 - Math.tanh(input * gain(state.drive)) * 140).toFixed(2)}`;
         }).join(' ');
         $('distortion-curve').setAttribute('d', curve);
+        const handle = $('distortion-drive-handle');
+        if (handle) {
+            handle.setAttribute('transform', `translate(${graphX} ${(140 - Math.tanh(graphInput * gain(state.drive)) * 140).toFixed(2)}) scale(${graphHandleScale().toFixed(4)} 1)`);
+            handle.setAttribute('aria-valuenow', state.drive);
+            handle.setAttribute('aria-valuetext', formatDb(state.drive));
+            handle.classList.toggle('graph-handle-active', state.drive !== defaults().drive);
+        }
         $('distortion-graph').setAttribute('aria-label', `Soft clipping curve at ${formatDb(state.drive)} drive, before tone, output and mix${state.enabled ? '' : ', bypassed'}`);
         $('distortion-status').textContent = !state.enabled ? 'Bypassed for playback and export.' : state.mix === 0 ? 'Mix is dry. Increase it to hear distortion.' : 'Applied to playback and exports.';
     }
@@ -80,6 +93,86 @@
         PSP.saveCurrentSettings();
         render();
     }
+    function setDrive(value) {
+        const next = Math.max(0, Math.min(36, Math.round(value * 2) / 2));
+        if (next === state.drive) return;
+        state.drive = next;
+        state.preset = 'Custom';
+        apply();
+    }
+    const graph = $('distortion-graph');
+    const driveHandle = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    driveHandle.id = 'distortion-drive-handle';
+    driveHandle.classList.add('graph-control', 'distortion-graph-handle');
+    driveHandle.setAttribute('tabindex', '0');
+    driveHandle.setAttribute('role', 'slider');
+    driveHandle.setAttribute('aria-label', 'Distortion drive');
+    driveHandle.setAttribute('aria-valuemin', '0');
+    driveHandle.setAttribute('aria-valuemax', '36');
+    driveHandle.setAttribute('aria-orientation', 'vertical');
+    const driveHit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    driveHit.classList.add('graph-handle-hit');
+    driveHit.setAttribute('r', '18');
+    const drivePoint = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    drivePoint.classList.add('graph-handle');
+    drivePoint.setAttribute('r', '7');
+    driveHandle.append(driveHit, drivePoint);
+    graph.append(driveHandle);
+    const beginGesture = () => document.dispatchEvent(new CustomEvent('soundgesturestart', { detail: { control: driveHandle, label: 'distortion drive' } }));
+    const endGesture = () => document.dispatchEvent(new Event('soundgestureend'));
+    function driveFromPointer(event) {
+        const rect = graph.getBoundingClientRect();
+        const y = (event.clientY - rect.top) / rect.height * 280;
+        const minimum = Math.tanh(graphInput);
+        const maximum = Math.tanh(graphInput * gain(36));
+        const output = Math.max(minimum, Math.min(maximum, (140 - y) / 140));
+        setDrive(20 * Math.log10(Math.atanh(output) / graphInput));
+    }
+    let draggingDrive = false, driveOrigin = null, driveFromHandle = false, driveMoved = false;
+    graph.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        event.preventDefault();
+        draggingDrive = true;
+        driveOrigin = { x: event.clientX, y: event.clientY };
+        driveFromHandle = Boolean(event.target.closest('#distortion-drive-handle'));
+        driveMoved = false;
+        beginGesture();
+        graph.setPointerCapture(event.pointerId);
+        if (!driveFromHandle) driveFromPointer(event);
+    });
+    graph.addEventListener('pointermove', event => {
+        if (!draggingDrive) return;
+        if (Math.hypot(event.clientX - driveOrigin.x, event.clientY - driveOrigin.y) >= 2) driveMoved = true;
+        if (driveMoved) driveFromPointer(event);
+    });
+    function stopDriveDrag(event) {
+        if (!draggingDrive) return;
+        if (event.type === 'pointerup' && (!driveFromHandle || driveMoved)) driveFromPointer(event);
+        draggingDrive = false;
+        driveOrigin = null;
+        if (graph.hasPointerCapture(event.pointerId)) graph.releasePointerCapture(event.pointerId);
+        endGesture();
+        driveHandle.focus({ preventScroll: true });
+    }
+    graph.addEventListener('pointerup', stopDriveDrag);
+    graph.addEventListener('pointercancel', stopDriveDrag);
+    driveHandle.addEventListener('keydown', event => {
+        const changes = { ArrowUp: .5, ArrowRight: .5, ArrowDown: -.5, ArrowLeft: -.5, PageUp: 3, PageDown: -3 };
+        let value = changes[event.key] === undefined ? null : state.drive + changes[event.key];
+        if (event.key === 'Home') value = 0;
+        if (event.key === 'End') value = 36;
+        if (value === null) return;
+        event.preventDefault();
+        beginGesture();
+        setDrive(value);
+        endGesture();
+    });
+    graph.addEventListener('dblclick', event => {
+        event.preventDefault();
+        beginGesture();
+        setDrive(defaults().drive);
+        endGesture();
+    });
     ['drive', 'tone', 'output', 'mix'].forEach(key => {
         $(`distortion-${key}`).addEventListener('input', event => {
             const value = Number(event.target.value);
@@ -102,5 +195,6 @@
         apply();
     });
     $('distortion-reset').addEventListener('click', () => { Object.assign(state, defaults()); apply(); });
+    new ResizeObserver(render).observe(graph);
     render();
 })();

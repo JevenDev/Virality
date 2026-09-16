@@ -104,6 +104,10 @@
         if (event.target.type !== 'range') return;
         if (gesture?.control !== event.target) gesture = { control: event.target, label: event.target.labels?.[0]?.textContent || 'sound settings', entry: null };
     }, true);
+    document.addEventListener('soundgesturestart', event => {
+        gesture = { control: event.detail.control, label: event.detail.label, entry: null };
+    });
+    document.addEventListener('soundgestureend', () => { gesture = null; });
     for (const type of ['change', 'click', 'focusout']) document.addEventListener(type, () => { gesture = null; }, true);
     document.addEventListener('keydown', event => {
         if (!(event.ctrlKey || event.metaKey) || event.altKey || document.querySelector('dialog[open]') ||

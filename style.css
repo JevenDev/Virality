@@ -294,11 +294,17 @@ dd { margin: 0; white-space: nowrap; }
 .eq-response { display: flex; gap: 1rem; margin: 1.75rem 0 1.5rem; }
 .eq-db-axis { display: flex; flex-direction: column; justify-content: space-between; width: 3rem; flex: none; padding-bottom: 1.5rem; font-size: .5625rem; color: var(--muted); }
 .eq-plot { flex: 1; min-width: 0; }
-#eq-graph { width: 100%; height: 10rem; display: block; overflow: hidden; }
+#eq-graph { width: 100%; height: 10rem; display: block; overflow: hidden; touch-action: none; cursor: crosshair; }
 #eq-graph path { fill: none; vector-effect: non-scaling-stroke; }
 .eq-grid { stroke: #d4e7ff18; stroke-width: 1; }
 .eq-zero { stroke: #d4e7ff60; stroke-width: 1; stroke-dasharray: 4 6; }
 #eq-curve { stroke: white; stroke-width: 2; }
+.graph-handle-hit { fill: transparent; }
+.graph-handle { fill: var(--page-color); stroke: var(--cursor-bg); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.graph-control { cursor: ns-resize; outline: none; }
+.graph-control:focus .graph-handle, .graph-control:hover .graph-handle { stroke-width: 4; }
+.graph-control.graph-handle-active .graph-handle { fill: var(--cursor-bg); stroke: var(--page-color); }
+.graph-control.graph-handle-active:focus .graph-handle, .graph-control.graph-handle-active:hover .graph-handle { stroke: var(--cursor-bg); }
 .eq-frequency-axis { position: relative; height: 1.5rem; font-size: .5625rem; color: var(--muted); padding-top: .5rem; }
 .eq-frequency-axis span { position: absolute; transform: translateX(-50%); }
 .eq-frequency-axis span:first-child { left: 0; transform: none; }
@@ -328,6 +334,7 @@ dd { margin: 0; white-space: nowrap; }
 .eq-preamp-footer .text-button { padding: .25rem 0; font-size: .625rem; }
 .eq-footnote { align-items: flex-start; margin-top: 1.5rem; color: var(--muted); font-size: .5625rem; line-height: 1.8; }
 .eq-bypassed #eq-curve { stroke: var(--muted); }
+.eq-bypassed .eq-graph-handles { opacity: .6; }
 .eq-bypassed .eq-bands, .eq-bypassed .eq-preamp-section { opacity: .6; }
 @media (max-width: 1100px) { .eq-bottom { grid-template-columns: 1fr; gap: 1.5rem; } .eq-preamp-section { max-width: 25rem; } }
 @media (max-width: 836px) { .eq-bands { grid-template-columns: repeat(5, minmax(0,1fr)); row-gap: 1.5rem; } .eq-band input[type="range"] { height: 7rem; } }
@@ -377,13 +384,14 @@ dd { margin: 0; white-space: nowrap; }
 .distortion-response figcaption { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: 1.5rem; }
 .distortion-response h2, .distortion-presets-section h2 { font-size: .875rem; font-weight: 400; }
 .distortion-response figcaption span, .distortion-legend { color: var(--muted); font-size: .5625rem; }
-#distortion-graph { width: 100%; height: 16rem; overflow: visible; }
+#distortion-graph { width: 100%; height: 16rem; overflow: visible; touch-action: none; cursor: ns-resize; }
 #distortion-graph path { fill: none; vector-effect: non-scaling-stroke; }
 .distortion-grid { stroke: #c7e1ff15; }
 .distortion-zero { stroke: #c7e1ff40; }
 .distortion-reference { stroke: #c7e1ff80; stroke-dasharray: 5 5; }
 #distortion-curve { stroke: #fff; stroke-width: 2; transition: opacity .2s; }
 .distortion-bypassed #distortion-curve { opacity: .35; }
+.distortion-bypassed .distortion-graph-handle { opacity: .6; }
 .distortion-legend { display: flex; justify-content: space-between; margin-top: .75rem; }
 .distortion-legend span { display: flex; align-items: center; gap: .5rem; }
 .distortion-legend span::before { content: ''; width: 1.25rem; border-top: 1px dashed #c7e1ff80; }
@@ -513,13 +521,15 @@ dd { margin: 0; white-space: nowrap; }
 .delay-response figcaption { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: 1.5rem; }
 .delay-response h2, .delay-presets-section h2 { font-size: .875rem; font-weight: 400; }
 .delay-response figcaption span, .delay-time-axis { color: var(--muted); font-size: .5625rem; }
-#delay-graph { display: block; width: 100%; height: 16rem; }
+#delay-graph { display: block; width: 100%; height: 16rem; touch-action: none; cursor: crosshair; }
 #delay-graph path { fill: none; vector-effect: non-scaling-stroke; }
 .delay-grid { stroke: #c7e1ff15; }
 .delay-zero { stroke: #c7e1ff40; }
 #delay-dry { stroke: #c7e1ff80; stroke-width: 2; }
 #delay-repeats { stroke: white; stroke-width: 2; transition: opacity .2s; }
 .delay-bypassed #delay-repeats { opacity: .25; }
+.delay-graph-handle { cursor: move; }
+.delay-bypassed .delay-graph-handles { opacity: .6; }
 .delay-time-axis { display: flex; justify-content: space-between; margin-top: .5rem; }
 .delay-controls { display: grid; gap: 1.5rem; align-content: center; border-left: 1px solid var(--line); padding-left: 2rem; }
 .delay-presets-section { border-top: 1px solid var(--line); padding-top: 1.25rem; }
