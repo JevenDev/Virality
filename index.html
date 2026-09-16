@@ -6,9 +6,10 @@
     <meta name="theme-color" content="#07358d">
     <meta name="description" content="A PSP-inspired audio editor for slowed + reverb, nightcore, and local WAV and MP3 exports.">
     <title>Virality · Audio editor</title>
-    <link rel="stylesheet" href="./style.css?v=2.15">
+    <link rel="stylesheet" href="./style.css?v=2.16">
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script defer src="./js/bg-waves.js?v=2.0"></script>
+    <script defer src="./js/backgrounds.js?v=1.0"></script>
     <script defer src="./js/equalizer.js?v=1.1"></script>
     <script defer src="./js/distortion.js?v=1.0"></script>
     <script defer src="./js/delay.js?v=1.0"></script>
@@ -17,7 +18,7 @@
     <script defer src="./js/preset-data.js?v=1.0"></script>
     <script defer src="./js/history.js?v=1.0"></script>
     <script defer src="./js/presets.js?v=1.2"></script>
-    <script defer src="./js/session-data.js?v=1.0"></script>
+    <script defer src="./js/session-data.js?v=1.1"></script>
     <script defer src="./js/sessions.js?v=1.0"></script>
     <script defer src="./js/loudness-worker.js?v=1.1"></script>
     <script defer src="./js/loudness.js?v=1.1"></script>
@@ -32,6 +33,7 @@
     <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13M9 8l12-2"/><ellipse cx="6" cy="18" rx="3" ry="2"/><ellipse cx="18" cy="16" rx="3" ry="2"/></symbol>
         <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 3v7m0 4v7M12 3v3m0 4v11M19 3v11m0 4v3M2 10h6M9 6h6m1 8h6"/></symbol>
+        <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18h1.5a2.5 2.5 0 0 0 0-5H12a2 2 0 0 1 0-4h3a6 6 0 0 0 0-9z"/><circle cx="7.5" cy="9" r=".75"/><circle cx="10" cy="6.5" r=".75"/><circle cx="7.5" cy="14" r=".75"/></symbol>
         <symbol id="i-library" viewBox="0 0 24 24"><path d="M3 5h4v16H3zM10 3h4v18h-4zM17 6l4-1 3 15-4 1z"/></symbol>
         <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
         <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
@@ -50,6 +52,7 @@
         <div class="dock-items" role="tablist" aria-label="Audio tools" aria-orientation="vertical">
             <button class="dock-item" id="dock-music" role="tab" aria-controls="music-page" aria-selected="true" data-tool="music"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Music</span></button>
             <button class="dock-item" id="dock-presets" role="tab" aria-controls="presets" aria-selected="false" tabindex="-1" data-tool="presets"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Presets</span></button>
+            <button class="dock-item" id="dock-backgrounds" role="tab" aria-controls="backgrounds" aria-selected="false" tabindex="-1" data-tool="backgrounds"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg><span>Background</span></button>
             <button class="dock-item" id="dock-equalizer" role="tab" aria-controls="equalizer" aria-selected="false" tabindex="-1" data-tool="equalizer"><svg class="icon" aria-hidden="true"><use href="#i-equalizer"/></svg><span>Equalizer</span></button>
             <button class="dock-item" id="dock-delay" role="tab" aria-controls="delay" aria-selected="false" tabindex="-1" data-tool="delay"><svg class="icon" aria-hidden="true"><use href="#i-delay"/></svg><span>Delay</span></button>
             <button class="dock-item" id="dock-distortion" role="tab" aria-controls="distortion" aria-selected="false" tabindex="-1" data-tool="distortion"><svg class="icon" aria-hidden="true"><use href="#i-distortion"/></svg><span>Distortion</span></button>
@@ -123,6 +126,45 @@
                 </div>
                 <div class="presets-footer"><p>Saved in this browser. Export your presets to back them up or use them elsewhere.</p><p>Import skips identical presets and gives conflicting names a numbered suffix.</p><p id="presets-import-result" role="status"></p></div>
                 <input type="file" id="presets-upload" accept=".json,application/json" hidden>
+            </section>
+            <section class="tool-page backgrounds-page" id="backgrounds" role="tabpanel" aria-labelledby="dock-backgrounds" hidden inert>
+                <div class="backgrounds-heading"><h1>Background</h1><button class="text-button" id="background-reset">Reset colors</button></div>
+                <div class="backgrounds-layout">
+                    <div class="background-editor">
+                        <fieldset>
+                            <legend>Page background</legend>
+                            <div class="background-mode-row"><label for="background-mode">Style</label><select id="background-mode"><option value="gradient">Gradient</option><option value="single">Single color</option></select></div>
+                            <div class="background-color-grid">
+                                <label class="color-control"><span>First color</span><span><input type="color" id="background-start" data-background-color="start" value="#071f65"><output for="background-start">#071F65</output></span></label>
+                                <label class="color-control gradient-only"><span>Middle color</span><span><input type="color" id="background-middle" data-background-color="middle" value="#0c48a5"><output for="background-middle">#0C48A5</output></span></label>
+                                <label class="color-control gradient-only"><span>End color</span><span><input type="color" id="background-end" data-background-color="end" value="#168bcc"><output for="background-end">#168BCC</output></span></label>
+                            </div>
+                            <label class="background-angle gradient-only" for="background-angle"><span>Gradient angle</span><span><input type="range" id="background-angle" min="0" max="360" step="1" value="155"><output for="background-angle">155°</output></span></label>
+                        </fieldset>
+                        <fieldset>
+                            <legend>Interface surfaces</legend>
+                            <div class="background-color-grid">
+                                <label class="color-control"><span>Fields and scroll tracks</span><span><input type="color" id="background-field" data-background-color="field" value="#174e91"><output for="background-field">#174E91</output></span></label>
+                                <label class="color-control"><span>Notices and floating controls</span><span><input type="color" id="background-surface" data-background-color="surface" value="#092956"><output for="background-surface">#092956</output></span></label>
+                                <label class="color-control"><span>Dialogs</span><span><input type="color" id="background-popup" data-background-color="popup" value="#0b3777"><output for="background-popup">#0B3777</output></span></label>
+                                <label class="color-control"><span>Mobile dock</span><span><input type="color" id="background-dock" data-background-color="dock" value="#082b6a"><output for="background-dock">#082B6A</output></span></label>
+                                <label class="color-control"><span>Drop target</span><span><input type="color" id="background-drop" data-background-color="drop" value="#07358d"><output for="background-drop">#07358D</output></span></label>
+                                <label class="color-control"><span>Cursor and active controls</span><span><input type="color" id="background-cursor" data-background-color="cursor" value="#ffffff"><output for="background-cursor">#FFFFFF</output></span></label>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <section class="background-presets" aria-labelledby="background-presets-title">
+                        <h2 id="background-presets-title">Color presets</h2>
+                        <label for="background-preset-select">Choose preset</label>
+                        <select id="background-preset-select"></select>
+                        <label for="background-preset-name">Save current colors</label>
+                        <div class="background-save-row"><input id="background-preset-name" maxlength="80" autocomplete="off" placeholder="Preset name"><button class="btn primary" id="background-save">Save</button></div>
+                        <div class="background-preset-actions"><button class="btn" id="background-delete">Delete</button><button class="btn" id="background-import">Import</button><button class="btn" id="background-export">Export my presets</button></div>
+                        <p>Colors and custom presets stay in this browser.</p>
+                        <p id="background-status" role="status"></p>
+                    </section>
+                </div>
+                <input type="file" id="background-upload" accept=".json,application/json" hidden>
             </section>
             <section class="tool-page eq-page" id="equalizer" role="tabpanel" aria-labelledby="dock-equalizer" hidden inert>
                 <div class="eq-heading"><div class="eq-title"><svg class="icon" aria-hidden="true"><use href="#i-equalizer"/></svg><h1>Equalizer</h1></div><div class="eq-actions"><button class="btn" id="eq-enabled" aria-pressed="true">EQ on</button><button class="text-button" id="eq-reset">Reset EQ</button></div></div>

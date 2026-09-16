@@ -2,7 +2,7 @@
     const PSP = window.PSP;
     const magic = new TextEncoder().encode('VIRALITY_SESSION\n');
     const maxHeader = 4 * 1024 * 1024;
-    const pages = ['music', 'presets', 'equalizer', 'delay', 'distortion', 'compressor', 'loudness'];
+    const pages = ['music', 'presets', 'backgrounds', 'equalizer', 'delay', 'distortion', 'compressor', 'loudness'];
     function number(value, min, max, label, integer = false) {
         if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max || (integer && !Number.isSafeInteger(value))) {
             throw new Error(`Invalid ${label} in this session.`);
