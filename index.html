@@ -6,19 +6,21 @@
     <meta name="theme-color" content="#07358d">
     <meta name="description" content="A PSP-inspired audio editor for slowed + reverb, nightcore, and local WAV and MP3 exports.">
     <title>Virality · Audio editor</title>
-    <link rel="stylesheet" href="./style.css?v=2.12">
+    <link rel="stylesheet" href="./style.css?v=2.13">
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script defer src="./js/bg-waves.js?v=2.0"></script>
     <script defer src="./js/equalizer.js?v=1.1"></script>
     <script defer src="./js/distortion.js?v=1.0"></script>
     <script defer src="./js/delay.js?v=1.0"></script>
     <script defer src="./js/audio-chain.js?v=1.2"></script>
-    <script defer src="./js/app.js?v=2.6"></script>
+    <script defer src="./js/app.js?v=2.7"></script>
+    <script defer src="./js/preset-data.js?v=1.0"></script>
+    <script defer src="./js/presets.js?v=1.0"></script>
     <script defer src="./js/loudness-worker.js?v=1.1"></script>
     <script defer src="./js/loudness.js?v=1.1"></script>
     <script defer src="./js/export.js?v=2.2"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
-    <script defer src="./js/dock.js?v=2.5"></script>
+    <script defer src="./js/dock.js?v=2.6"></script>
 </head>
 <body>
     <a class="skip-link" href="#player">Skip to player</a>
@@ -44,6 +46,7 @@
         <button class="dock-step dock-previous" id="dock-previous" aria-label="Previous tool"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         <div class="dock-items" role="tablist" aria-label="Audio tools" aria-orientation="vertical">
             <button class="dock-item" id="dock-music" role="tab" aria-controls="music-page" aria-selected="true" data-tool="music"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Music</span></button>
+            <button class="dock-item" id="dock-presets" role="tab" aria-controls="presets" aria-selected="false" tabindex="-1" data-tool="presets"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Presets</span></button>
             <button class="dock-item" id="dock-equalizer" role="tab" aria-controls="equalizer" aria-selected="false" tabindex="-1" data-tool="equalizer"><svg class="icon" aria-hidden="true"><use href="#i-equalizer"/></svg><span>Equalizer</span></button>
             <button class="dock-item" id="dock-delay" role="tab" aria-controls="delay" aria-selected="false" tabindex="-1" data-tool="delay"><svg class="icon" aria-hidden="true"><use href="#i-delay"/></svg><span>Delay</span></button>
             <button class="dock-item" id="dock-distortion" role="tab" aria-controls="distortion" aria-selected="false" tabindex="-1" data-tool="distortion"><svg class="icon" aria-hidden="true"><use href="#i-distortion"/></svg><span>Distortion</span></button>
@@ -77,13 +80,13 @@
                         </div><div class="volume-control"><button class="media-btn" id="mute-button" aria-label="Mute" aria-pressed="false"><svg class="icon"><use href="#i-volume"/></svg></button><input type="range" id="volume-slider" min="0" max="100" value="80" aria-label="Preview volume"><output for="volume-slider" id="volume-val">80%</output></div></div>
                     </section>
                     <section class="effects" id="effects" aria-labelledby="effects-title">
-                        <div class="section-heading"><h2 id="effects-title">Sound settings</h2><button class="text-button" id="reset-effects">Reset</button></div>
+                        <div class="section-heading"><h2 id="effects-title">Sound settings</h2><button class="text-button" id="reset-effects">Reset sound</button></div>
                         <div class="sliders-group">
                             <div class="control-row"><div class="label-row"><label for="speed-slider">Playback speed</label><output for="speed-slider" id="speed-val">1.00×</output></div><input type="range" min="0.5" max="1.5" step="0.01" value="1" id="speed-slider"><div class="range-labels"><span>0.5×</span><span>1.5×</span></div></div>
                             <div class="control-row"><div class="label-row"><label for="mix-slider">Reverb mix</label><output for="mix-slider" id="mix-val">0%</output></div><input type="range" min="0" max="1" step="0.01" value="0" id="mix-slider"></div>
                             <div class="control-row"><div class="label-row"><label for="decay-slider">Reverb decay</label><output for="decay-slider" id="decay-val">2.0s</output></div><input type="range" min="0.5" max="10" step="0.1" value="2" id="decay-slider"></div>
                         </div>
-                        <div class="preset-heading"><h3>Presets</h3><span id="preset-name">Default</span></div><div class="presets-group" id="presets-group"></div>
+                        <div class="preset-heading"><h3>Current preset</h3><span id="preset-name">Default</span></div><a class="btn preset-library-link" href="#presets">Browse and save presets</a>
                     </section>
                 </div>
                 <section class="library" id="library" aria-labelledby="library-title">
@@ -92,6 +95,30 @@
                     <div id="file-rows" role="list" aria-label="Audio tracks"></div>
                     <div class="export-controls"><p>© JVN 2026</p><div class="export-options"><button class="btn primary" id="batch-btn" disabled><svg class="icon"><use href="#i-download"/></svg>Export all</button></div></div>
                 </section>
+            </section>
+            <section class="tool-page presets-page" id="presets" role="tabpanel" aria-labelledby="dock-presets" hidden inert>
+                <div class="presets-heading"><h1>Presets</h1><div class="presets-toolbar"><button class="btn" id="presets-import">Import</button><button class="btn" id="presets-export-all">Export my presets</button><button class="btn primary" id="presets-save">Save current sound</button></div></div>
+                <div class="presets-current-row"><p id="presets-current">Current sound: Default</p><button class="text-button" id="presets-undo" disabled>Undo preset application</button></div>
+                <div class="presets-layout">
+                    <div class="presets-browser">
+                        <label for="presets-search">Search presets</label><input id="presets-search" type="search" placeholder="Name, description, or effect" autocomplete="off">
+                        <div class="presets-filter-row"><label for="presets-filter">Show</label><select id="presets-filter"><option value="all">All presets</option><option value="builtin">Built-in</option><option value="user">My presets</option></select><span id="presets-count"></span></div>
+                        <ul id="presets-list" aria-label="Preset library"></ul>
+                        <p id="presets-empty" hidden>No presets match your search.</p>
+                    </div>
+                    <section class="presets-detail" id="presets-detail" aria-labelledby="presets-detail-name">
+                        <div class="presets-detail-heading"><h2 id="presets-detail-name"></h2><span id="presets-origin"></span></div>
+                        <p id="presets-description"></p>
+                        <dl id="presets-values"></dl>
+                        <details class="presets-eq-details"><summary>EQ band values</summary><dl id="presets-bands"></dl></details>
+                        <p id="presets-target"></p>
+                        <div class="presets-apply-actions"><button class="btn primary" id="presets-apply">Apply preset</button><button class="btn" id="presets-apply-all">Apply to all tracks</button></div>
+                        <p class="presets-apply-note">Replaces speed and all effect settings, including bypass states.</p>
+                        <div class="presets-manage-actions"><button class="btn" id="presets-update">Update from current sound</button><button class="btn" id="presets-edit">Edit name / description</button><button class="btn" id="presets-duplicate">Duplicate</button><button class="btn" id="presets-export">Export preset</button><button class="text-button" id="presets-delete">Delete</button></div>
+                    </section>
+                </div>
+                <div class="presets-footer"><p>Saved in this browser. Export your presets to back them up or use them elsewhere.</p><p>Import skips identical presets and gives conflicting names a numbered suffix.</p><p id="presets-import-result" role="status"></p></div>
+                <input type="file" id="presets-upload" accept=".json,application/json" hidden>
             </section>
             <section class="tool-page eq-page" id="equalizer" role="tabpanel" aria-labelledby="dock-equalizer" hidden inert>
                 <div class="eq-heading"><div class="eq-title"><svg class="icon" aria-hidden="true"><use href="#i-equalizer"/></svg><h1>Equalizer</h1></div><div class="eq-actions"><button class="btn" id="eq-enabled" aria-pressed="true">EQ on</button><button class="text-button" id="eq-reset">Reset EQ</button></div></div>
@@ -177,7 +204,8 @@
     <div class="drop-overlay" id="drop-overlay" hidden><svg class="icon"><use href="#i-plus"/></svg><h2>Drop to add to your library</h2></div>
     <div id="notice" class="notice" role="status" hidden></div>
     <div class="export-bar" id="export-bar" hidden><div class="export-top"><span id="export-title" role="status">Exporting…</span><span id="export-pct">0%</span><button id="export-cancel" class="btn" disabled>Cancel</button></div><div class="export-track" id="export-progress" role="progressbar" aria-label="Export progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="export-fill"></div></div></div>
-    <dialog id="preset-dialog" aria-labelledby="preset-dialog-title"><form id="preset-form"><h2 id="preset-dialog-title">Save preset</h2><p>Presets are saved in this browser.</p><label for="preset-input">Preset name</label><input id="preset-input" maxlength="24" required autocomplete="off" placeholder="Late night"><div class="dialog-actions"><button type="button" class="btn" id="preset-cancel">Cancel</button><button type="submit" class="btn primary">Save preset</button></div></form></dialog>
+    <dialog id="preset-dialog" aria-labelledby="preset-dialog-title"><form id="preset-form"><h2 id="preset-dialog-title">Save current sound</h2><p>Includes speed, reverb, EQ, delay, and distortion settings.</p><label for="preset-input">Preset name</label><input id="preset-input" maxlength="80" required autocomplete="off" placeholder="Late night"><label for="preset-description-input">Description (optional)</label><textarea id="preset-description-input" maxlength="240" rows="3" placeholder="What does this sound work well for?"></textarea><p id="preset-dialog-error" role="alert"></p><div class="dialog-actions"><button type="button" class="btn" id="preset-cancel">Cancel</button><button type="submit" class="btn primary">Save preset</button></div></form></dialog>
+    <dialog id="preset-delete-dialog" aria-labelledby="preset-delete-title"><h2 id="preset-delete-title">Delete preset</h2><p id="preset-delete-name"></p><div class="dialog-actions"><button type="button" class="btn" id="preset-delete-cancel" autofocus>Cancel</button><button type="button" class="btn" id="preset-delete-confirm">Delete preset</button></div></dialog>
     <dialog id="help-dialog" aria-labelledby="help-title"><h2 id="help-title">Keyboard shortcuts</h2><dl><div><dt>Cycle tools (dock focused)</dt><dd><kbd>↑</kbd> <kbd>↓</kbd></dd></div><div><dt>Play / pause</dt><dd><kbd>Space</kbd></dd></div><div><dt>Seek 5 seconds</dt><dd><kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Previous / next track</dt><dd><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Mute preview</dt><dd><kbd>M</kbd></dd></div><div><dt>Repeat track</dt><dd><kbd>R</kbd></dd></div></dl><p>Speed also changes pitch. Preview volume does not affect exports.</p><form method="dialog"><button class="btn primary">Got it</button></form></dialog>
     <noscript><p class="notice">Enable JavaScript to use the audio editor.</p></noscript>
 </body>

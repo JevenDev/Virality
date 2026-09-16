@@ -52,6 +52,7 @@
     PSP.defaultSettings = () => ({ speed: 1, mix: 0, decay: 2, eq: PSP.eq.defaults(), distortion: PSP.distortion.defaults(), delay: PSP.delay.defaults(), preset: 'Default', presetId: 'default' });
     PSP.captureSettings = () => ({ ...PSP.currentSettings(), eq: PSP.eq.snapshot(), distortion: PSP.distortion.snapshot(), delay: PSP.delay.snapshot(), preset: PSP.currentPresetName, presetId: selectedPreset });
     PSP.saveCurrentSettings = () => {
+        PSP.presets?.sync();
         const track = PSP.playlist[PSP.currentIndex];
         if (track) {
             track.settings = PSP.captureSettings();
@@ -74,7 +75,18 @@
         PSP.delay.restore(settings.delay);
         updateSettings();
     }
+    PSP.setPresetIdentity = (id, name) => {
+        selectedPreset = id;
+        PSP.currentPresetName = name;
+        PSP.saveCurrentSettings();
+    };
+    PSP.applySettings = settings => {
+        restoreSettings(structuredClone(settings));
+        apply(true);
+        PSP.saveCurrentSettings();
+    };
     function updateWorkspace() {
+        PSP.presets?.sync();
         $('workspace-track').value = PSP.currentIndex < 0 ? '' : String(PSP.currentIndex);
         $('workspace-play').disabled = !PSP.isLoaded;
         $('workspace-play').textContent = PSP.isPlaying ? 'Pause' : 'Play';
@@ -389,101 +401,12 @@
     $('volume-slider').addEventListener('input', updateVolume);
     $('mute-button').addEventListener('click', toggleMute);
 
-    const PRESET_KEY = 'psp_audio_editor_user_presets_v1';
-    const builtinPresets = [
-        { id: 'default', name: 'Default', values: { speed: 1, mix: 0, decay: 2 } },
-        { id: 'slowed', name: 'Slowed', values: { speed: .82, mix: .45, decay: 4.2 } },
-        { id: 'nightcore', name: 'Nightcore', values: { speed: 1.25, mix: .12, decay: 2 } },
-        { id: 'faded', name: 'Faded', values: { speed: .9, mix: .25, decay: 2 } },
-        { id: 'perfect', name: 'Perfect!', values: { speed: 1.1, mix: .1, decay: 2 } }
-    ];
-    function loadUserPresets() {
-        try {
-            const saved = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]');
-            if (!Array.isArray(saved)) return [];
-            return saved.filter(p => p && typeof p.name === 'string' && p.values && ['speed', 'mix', 'decay'].every(key => Number.isFinite(Number(p.values[key])))).map((p, index) => ({
-                id: typeof p.id === 'string' && p.id.startsWith('user_') ? p.id : `user_${index}`, name: p.name.slice(0, 24), user: true,
-                values: { speed: clamp(Number(p.values.speed), .5, 1.5), mix: clamp(Number(p.values.mix), 0, 1), decay: clamp(Number(p.values.decay), .5, 10) }
-            }));
-        } catch { PSP.notify('Saved presets are unavailable in this browser. You can still edit audio.'); return []; }
-    }
-    let userPresets = loadUserPresets();
-    function saveUserPresets(next) {
-        try { localStorage.setItem(PRESET_KEY, JSON.stringify(next)); userPresets = next; return true; }
-        catch { PSP.notify('Could not save presets. Browser storage may be full or disabled.'); return false; }
-    }
-    function selectPreset(preset) {
-        selectedPreset = preset.id;
-        PSP.currentPresetName = preset.name;
-        PSP.speedS.value = preset.values.speed;
-        PSP.mixS.value = preset.values.mix;
-        PSP.decayS.value = preset.values.decay;
-        updateSettings();
-        apply();
-        PSP.saveCurrentSettings();
-    }
-    function updatePresetSelection() {
-        $('preset-name').textContent = PSP.currentPresetName;
-        document.querySelectorAll('[data-preset]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.preset === selectedPreset)));
-    }
-    function renderPresets() {
-        $('presets-group').replaceChildren();
-        for (const preset of [...builtinPresets, ...userPresets]) {
-            const wrapper = document.createElement('div');
-            wrapper.className = `preset${preset.user ? ' user-preset' : ''}`;
-            const button = document.createElement('button');
-            button.textContent = preset.name;
-            button.title = `${preset.name}: ${preset.values.speed}×, ${Math.round(preset.values.mix * 100)}% reverb, ${preset.values.decay}s decay`;
-            button.dataset.preset = preset.id;
-            button.addEventListener('click', () => selectPreset(preset));
-            wrapper.append(button);
-            if (preset.user) {
-                const remove = document.createElement('button');
-                remove.className = 'delete-preset';
-                remove.setAttribute('aria-label', `Delete preset ${preset.name}`);
-                remove.append(icon('close'));
-                remove.addEventListener('click', () => {
-                    if (!saveUserPresets(userPresets.filter(p => p.id !== preset.id))) return;
-                    if (selectedPreset === preset.id) { selectedPreset = null; PSP.currentPresetName = 'Custom'; }
-                    renderPresets();
-                    $('reset-effects').focus();
-                });
-                wrapper.append(remove);
-            }
-            $('presets-group').append(wrapper);
-        }
-        const wrapper = document.createElement('div');
-        wrapper.className = 'preset';
-        const save = document.createElement('button');
-        save.textContent = '+ Save';
-        save.setAttribute('aria-label', 'Save preset');
-        save.addEventListener('click', () => { $('preset-input').value = ''; $('preset-dialog').showModal(); });
-        wrapper.append(save);
-        $('presets-group').append(wrapper);
-        updatePresetSelection();
-    }
-    $('preset-cancel').addEventListener('click', () => $('preset-dialog').close());
-    $('preset-form').addEventListener('submit', event => {
-        event.preventDefault();
-        const name = $('preset-input').value.trim();
-        if (!name) { $('preset-input').setCustomValidity('Enter a preset name.'); $('preset-input').reportValidity(); return; }
-        const preset = { id: `user_${Date.now()}`, name, values: PSP.currentSettings(), user: true };
-        if (!saveUserPresets([...userPresets, preset])) return;
-        selectedPreset = preset.id;
-        PSP.currentPresetName = name;
-        PSP.saveCurrentSettings();
-        $('preset-dialog').close();
-        renderPresets();
-        PSP.notify(`Saved “${name}”.`);
-    });
-    $('preset-input').addEventListener('input', () => $('preset-input').setCustomValidity(''));
-    $('reset-effects').addEventListener('click', () => selectPreset(builtinPresets[0]));
     function updateSettings() {
         $('speed-val').textContent = `${Number(PSP.speedS.value).toFixed(2)}×`;
         $('mix-val').textContent = `${Math.round(PSP.mixS.value * 100)}%`;
         $('decay-val').textContent = `${Number(PSP.decayS.value).toFixed(1)}s`;
         for (const slider of [PSP.speedS, PSP.mixS, PSP.decayS]) fillRange(slider);
-        updatePresetSelection();
+        $('preset-name').textContent = PSP.currentPresetName;
     }
     function apply(immediate = false) {
         if (!PSP.player) return;
@@ -496,8 +419,6 @@
         PSP.processing.update(PSP.captureSettings(), { immediate });
     }
     for (const slider of [PSP.speedS, PSP.mixS, PSP.decayS]) slider.addEventListener('input', () => {
-        selectedPreset = null;
-        PSP.currentPresetName = 'Custom';
         updateSettings();
         apply();
         PSP.saveCurrentSettings();
@@ -578,7 +499,6 @@
     }
     updateClock();
     setInterval(updateClock, 60000);
-    renderPresets();
     updateSettings();
     updateVolume();
     renderList();

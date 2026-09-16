@@ -85,6 +85,7 @@
         tablist.setAttribute('aria-orientation', mobile.matches ? 'horizontal' : 'vertical');
         highlightItems(-1, false);
         arrange(false);
+        if (mobile.matches) tabs[selected].scrollIntoView({ block: 'nearest', inline: 'center' });
     }
     function settlePages() {
         stack.style.removeProperty('height');
@@ -124,6 +125,7 @@
         if (updateHistory) history.pushState(null, '', `#${tabs[index].dataset.tool}`);
         highlightItems(-1, animate);
         arrange(animate);
+        if (mobile.matches) tabs[index].scrollIntoView({ block: 'nearest', inline: 'center' });
         const finish = () => {
             settlePages();
             if (anchor && musicAnchors.has(anchor)) document.getElementById(anchor)?.scrollIntoView({ block: 'start', behavior: 'instant' });
@@ -195,7 +197,7 @@
         const touch = event.changedTouches[0];
         const delta = mobile.matches ? touchStart.x - touch.clientX : touchStart.y - touch.clientY;
         touchStart = null;
-        if (Math.abs(delta) >= 40) selectTool(selected + Math.sign(delta));
+        if (!mobile.matches && Math.abs(delta) >= 40) selectTool(selected + Math.sign(delta));
     }, { passive: true });
     dock.addEventListener('touchcancel', () => { touchStart = null; });
     document.querySelectorAll('.return-to-music').forEach(button => button.addEventListener('click', () => selectTool(0, { focus: true })));
