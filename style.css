@@ -7,7 +7,12 @@
 }
 :root { font-size: 110%; font-family: "NewRodinPro", sans-serif; color: #fff; background: #07358d; --muted: #c5d7f2; --line: rgba(221,238,255,.24); }
 * { box-sizing: border-box; }
-html { scrollbar-gutter: stable; scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+html { overflow-y: scroll; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #fff #092e72; scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@supports selector(::-webkit-scrollbar) { html { scrollbar-width: auto; scrollbar-color: auto; } }
+html::-webkit-scrollbar { width: 10px; }
+html::-webkit-scrollbar-track { background: #092e72; }
+html::-webkit-scrollbar-thumb { background: #fff; background-clip: padding-box; border: 2px solid transparent; border-radius: 5px; box-shadow: 0 0 6px #ffffffa6; }
+html::-webkit-scrollbar-thumb:hover { box-shadow: 0 0 9px #fff; }
 body { margin: 0; min-width: 0; min-height: 100svh; background: linear-gradient(155deg, #071f65 0%, #0c48a5 48%, #168bcc 100%); }
 button, input, select { font: inherit; }
 button, a, input, select { -webkit-tap-highlight-color: transparent; }

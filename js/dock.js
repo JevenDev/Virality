@@ -8,6 +8,7 @@
     const compact = matchMedia('(max-width: 1739px)');
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
     const motions = tabs.map(() => ({ slot: 0 }));
+    const highlights = tabs.map(() => ({ amount: 0 }));
     const musicAnchors = new Set(['', 'music', 'music-page', 'player', 'effects', 'library']);
     let selected = 0, initialized = false, transition;
     let itemHeight = 0, trackHeight = 0, unit = 16;
@@ -20,9 +21,12 @@
     function positionItem(index) {
         const slot = wrap(motions[index].slot);
         const distance = Math.abs(slot);
+        const highlight = highlights[index].amount;
         let x = 0, y = 0;
-        const scale = mobile.matches ? 1.06 - Math.min(distance, 1) * .12 : 1.14 - Math.min(distance, 2) * .17;
+        const baseScale = mobile.matches ? 1.06 - Math.min(distance, 1) * .12 : 1.14 - Math.min(distance, 2) * .17;
+        const scale = baseScale * (1 + highlight * (compact.matches ? .2 : .3));
         let opacity = 1 - Math.min(distance, 2) * .25;
+        opacity += (1 - opacity) * highlight * .8;
         if (mobile.matches) y = -Math.max(0, 1 - distance) * 5;
         else {
             const angle = slot * .47;
@@ -32,9 +36,28 @@
             // wrapped items fade out at the end of the arc before reappearing at the other end
             if (distance > 2) opacity *= Math.max(0, 1 - (distance - 2) * 2);
         }
+        x += highlight * unit * (compact.matches ? .2 : .45);
         tabs[index].style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
         tabs[index].style.opacity = String(opacity);
-        tabs[index].style.zIndex = String(Math.round(10 - distance));
+        tabs[index].style.zIndex = String(Math.round(10 - distance + highlight * 5));
+    }
+    function highlightItems(index, animate = true) {
+        const active = index >= 0 && !mobile.matches && !reducedMotion.matches;
+        const hoveredSlot = active ? wrap(motions[index].slot) : 0;
+        highlights.forEach((highlight, i) => {
+            const distance = Math.abs(wrap(motions[i].slot) - hoveredSlot);
+            const amount = active ? Math.max(0, 1 - distance / 1.6) : 0;
+            if (window.gsap) gsap.killTweensOf(highlight);
+            if (animate && window.gsap && !reducedMotion.matches) {
+                gsap.to(highlight, {
+                    amount, duration: active ? .22 : .32, ease: 'power3.out',
+                    onUpdate: () => positionItem(i)
+                });
+            } else {
+                highlight.amount = amount;
+                positionItem(i);
+            }
+        });
     }
     function arrange(animate) {
         tabs.forEach((tab, index) => {
@@ -60,6 +83,7 @@
         trackHeight = tablist.clientHeight;
         itemHeight = tabs[0].offsetHeight;
         tablist.setAttribute('aria-orientation', mobile.matches ? 'horizontal' : 'vertical');
+        highlightItems(-1, false);
         arrange(false);
     }
     function settlePages() {
@@ -98,6 +122,7 @@
             pages[i].inert = i !== index;
         });
         if (updateHistory) history.pushState(null, '', `#${tabs[index].dataset.tool}`);
+        highlightItems(-1, animate);
         arrange(animate);
         const finish = () => {
             settlePages();
@@ -124,7 +149,14 @@
         const index = musicAnchors.has(anchor) ? 0 : tabs.findIndex(tab => tab.dataset.tool === anchor);
         if (index >= 0) selectTool(index, { animate, updateHistory: false, anchor });
     }
-    tabs.forEach((tab, index) => tab.addEventListener('click', () => selectTool(index)));
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => selectTool(index));
+        tab.addEventListener('pointerenter', event => {
+            if (event.pointerType !== 'touch') highlightItems(index);
+        });
+        tab.addEventListener('pointerleave', () => highlightItems(-1));
+        tab.addEventListener('pointercancel', () => highlightItems(-1));
+    });
     dock.querySelector('#dock-previous').addEventListener('click', () => selectTool(selected - 1, { focus: true }));
     dock.querySelector('#dock-next').addEventListener('click', () => selectTool(selected + 1, { focus: true }));
     dock.addEventListener('keydown', event => {
@@ -171,6 +203,7 @@
     window.addEventListener('hashchange', () => route(true));
     reducedMotion.addEventListener('change', () => {
         transition?.progress(1);
+        highlightItems(-1, false);
         arrange(false);
     });
     new ResizeObserver(resize).observe(tablist);
