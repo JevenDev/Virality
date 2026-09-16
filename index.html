@@ -6,12 +6,13 @@
     <meta name="theme-color" content="#07358d">
     <meta name="description" content="A PSP-inspired audio editor for slowed + reverb, nightcore, and local WAV and MP3 exports.">
     <title>Virality · Audio editor</title>
-    <link rel="stylesheet" href="./style.css?v=2.8">
+    <link rel="stylesheet" href="./style.css?v=2.9">
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script defer src="./js/bg-waves.js?v=2.0"></script>
     <script defer src="./js/equalizer.js?v=1.1"></script>
-    <script defer src="./js/audio-chain.js?v=1.0"></script>
-    <script defer src="./js/app.js?v=2.3"></script>
+    <script defer src="./js/distortion.js?v=1.0"></script>
+    <script defer src="./js/audio-chain.js?v=1.1"></script>
+    <script defer src="./js/app.js?v=2.4"></script>
     <script defer src="./js/export.js?v=2.2"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
     <script defer src="./js/dock.js?v=2.5"></script>
@@ -103,13 +104,19 @@
                     <button class="text-button return-to-music">Back to music</button>
                 </div>
             </section>
-            <section class="tool-page coming-soon-page" id="distortion" role="tabpanel" aria-labelledby="dock-distortion" hidden inert>
-                <div class="coming-soon-content">
-                    <svg class="soon-icon icon" aria-hidden="true"><use href="#i-distortion"/></svg>
-                    <h1 class="soon-heading">Distortion</h1>
-                    <p class="soon-message">Coming soon</p>
-                    <button class="text-button return-to-music">Back to music</button>
+            <section class="tool-page distortion-page" id="distortion" role="tabpanel" aria-labelledby="dock-distortion" hidden inert>
+                <div class="distortion-heading"><div class="distortion-title"><svg class="icon" aria-hidden="true"><use href="#i-distortion"/></svg><h1>Distortion</h1></div><div class="distortion-actions"><button class="btn" id="distortion-enabled" aria-pressed="false">Bypassed</button><button class="text-button" id="distortion-reset">Reset distortion</button></div></div>
+                <div class="distortion-layout">
+                    <figure class="distortion-response"><figcaption><h2>Clipping curve</h2><span>Before tone and mix</span></figcaption><svg id="distortion-graph" viewBox="0 0 480 280" preserveAspectRatio="none" role="img" aria-label="Distortion clipping curve"><path class="distortion-grid" d="M0 0H480 M0 70H480 M0 210H480 M0 280H480 M120 0V280 M360 0V280"/><path class="distortion-zero" d="M0 140H480 M240 0V280"/><path class="distortion-reference" d="M0 280L480 0"/><path id="distortion-curve" d="M0 280L480 0"/></svg><div class="distortion-legend" aria-hidden="true"><span>Input level</span><span>Clipped output</span></div></figure>
+                    <div class="distortion-controls">
+                        <div><div class="label-row"><label for="distortion-drive">Drive</label><output id="distortion-drive-value" for="distortion-drive">+12 dB</output></div><input id="distortion-drive" type="range" min="0" max="36" step="0.5" value="12"><div class="range-labels"><span>0 dB</span><span>+36 dB</span></div></div>
+                        <div><div class="label-row"><label for="distortion-tone">Tone</label><output id="distortion-tone-value" for="distortion-tone">8.0 kHz</output></div><input id="distortion-tone" type="range" min="0" max="100" step="1" value="80"><div class="range-labels"><span>Dark</span><span>Bright</span></div></div>
+                        <div><div class="label-row"><label for="distortion-output">Output</label><output id="distortion-output-value" for="distortion-output">−9 dB</output></div><input id="distortion-output" type="range" min="-24" max="0" step="0.5" value="-9"><div class="range-labels"><span>−24 dB</span><span>0 dB</span></div></div>
+                        <div><div class="label-row"><label for="distortion-mix">Mix</label><output id="distortion-mix-value" for="distortion-mix">50%</output></div><input id="distortion-mix" type="range" min="0" max="100" step="1" value="50"><div class="range-labels"><span>Dry</span><span>Wet</span></div></div>
+                    </div>
                 </div>
+                <div class="distortion-presets-section"><div class="preset-heading"><h2>Presets</h2><span id="distortion-preset-name">Off</span></div><div class="distortion-presets" id="distortion-presets"></div></div>
+                <div class="distortion-footnote"><p id="distortion-status">Bypassed for playback and export.</p><span>Tone and output affect the wet signal.</span></div>
             </section>
             <section class="tool-page coming-soon-page" id="compressor" role="tabpanel" aria-labelledby="dock-compressor" hidden inert>
                 <div class="coming-soon-content">

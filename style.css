@@ -380,3 +380,54 @@ dd { margin: 0; white-space: nowrap; }
     .workspace { margin-top: 1.5rem; }
     .eq-page { padding-top: 1.75rem; }
 }
+
+.distortion-page { padding: 3rem 0 2rem; }
+.distortion-heading, .distortion-title, .distortion-actions { display: flex; align-items: center; gap: 1rem; }
+.distortion-heading { justify-content: space-between; }
+.distortion-title .icon { width: 2rem; height: 2rem; }
+.distortion-title h1 { font-size: 1.75rem; letter-spacing: -.6px; }
+.distortion-actions { gap: 1.25rem; }
+#distortion-enabled[aria-pressed="true"], .distortion-presets .btn[aria-pressed="true"] { background: #f4f8ff; color: #163968; border-color: #f4f8ff; }
+.distortion-layout { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: 3rem; margin: 2.5rem 0 2rem; }
+.distortion-response { margin: 0; min-width: 0; }
+.distortion-response figcaption { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: 1.5rem; }
+.distortion-response h2, .distortion-presets-section h2 { font-size: .875rem; font-weight: 400; }
+.distortion-response figcaption span, .distortion-legend { color: var(--muted); font-size: .5625rem; }
+#distortion-graph { width: 100%; height: 16rem; overflow: visible; }
+#distortion-graph path { fill: none; vector-effect: non-scaling-stroke; }
+.distortion-grid { stroke: #c7e1ff15; }
+.distortion-zero { stroke: #c7e1ff40; }
+.distortion-reference { stroke: #c7e1ff80; stroke-dasharray: 5 5; }
+#distortion-curve { stroke: #fff; stroke-width: 2; transition: opacity .2s; }
+.distortion-bypassed #distortion-curve { opacity: .35; }
+.distortion-legend { display: flex; justify-content: space-between; margin-top: .75rem; }
+.distortion-legend span { display: flex; align-items: center; gap: .5rem; }
+.distortion-legend span::before { content: ''; width: 1.25rem; border-top: 1px dashed #c7e1ff80; }
+.distortion-legend span:last-child::before { border-top: 2px solid #fff; }
+.distortion-controls { display: grid; gap: 1.5rem; align-content: center; border-left: 1px solid var(--line); padding-left: 2rem; }
+.distortion-presets-section { border-top: 1px solid var(--line); padding-top: 1.25rem; }
+.distortion-presets-section .preset-heading { margin: 0 0 .75rem; }
+.distortion-presets { display: flex; flex-wrap: wrap; gap: .375rem; }
+.distortion-presets .btn { min-width: 6rem; }
+.distortion-footnote { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; color: var(--muted); font-size: .5625rem; line-height: 1.8; }
+.distortion-footnote p { margin: 0; }
+@media (max-width: 1100px) {
+    .distortion-layout { grid-template-columns: minmax(0, 1fr) 15rem; gap: 1.5rem; }
+    .distortion-controls { padding-left: 1.5rem; }
+}
+@media (max-width: 836px) {
+    .distortion-layout { grid-template-columns: 1fr; }
+    #distortion-graph { height: 12rem; }
+    .distortion-controls { grid-template-columns: 1fr 1fr; border-left: 0; padding-left: 0; gap: 1.5rem; }
+}
+@media (max-width: 640px) {
+    .distortion-page { padding-top: 1.75rem; }
+    .distortion-heading { align-items: flex-start; }
+    .distortion-title { gap: .5rem; }
+    .distortion-title h1 { font-size: 1.25rem; }
+    .distortion-title .icon { width: 1.5rem; }
+    .distortion-actions { flex-direction: column; gap: .25rem; }
+    .distortion-actions .btn { font-size: .625rem; }
+    .distortion-layout { margin-top: 1.75rem; }
+    .distortion-footnote { flex-direction: column; gap: .5rem; }
+}

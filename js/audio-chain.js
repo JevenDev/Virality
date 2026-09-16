@@ -30,6 +30,13 @@
                 ? { label: settings.eq.enabled ? 'Equalizer' : 'EQ bypassed', active: settings.eq.enabled } : null
         },
         {
+            id: 'distortion', page: 'distortion',
+            create: (context, settings) => PSP.distortion.createChain(context, settings.distortion),
+            update: (stage, settings, immediate) => stage.update(settings.distortion, immediate),
+            describe: settings => settings.distortion.enabled || settings.distortion.preset !== 'Off'
+                ? { label: settings.distortion.enabled && settings.distortion.mix > 0 ? 'Distortion' : 'Distortion bypassed', active: settings.distortion.enabled && settings.distortion.mix > 0 } : null
+        },
+        {
             id: 'reverb', page: 'effects', create: createReverb,
             update: (stage, settings, immediate) => stage.update(settings, immediate),
             tail: settings => settings.mix > 0 ? settings.decay + .01 : 0,
