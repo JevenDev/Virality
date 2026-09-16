@@ -70,6 +70,13 @@
         });
         return response;
     }
+    function responseAt(frequency, response) {
+        const position = Math.log(frequency / sampleFrequencies[0]) / Math.log(sampleFrequencies.at(-1) / sampleFrequencies[0]) * (response.length - 1);
+        const before = Math.floor(position);
+        const after = Math.min(response.length - 1, before + 1);
+        const amount = position - before;
+        return response[before] * (1 - amount) + response[after] * amount;
+    }
     function autoGain() {
         const peak = Math.max(...frequencyResponse(false));
         state.preamp = Math.max(-24, Math.min(0, -Math.ceil(peak * 2) / 2));
@@ -85,6 +92,7 @@
         $('equalizer').classList.toggle('eq-bypassed', !state.enabled);
         $('eq-preset-name').textContent = presetName;
         document.querySelectorAll('[data-eq-preset]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.eqPreset === presetName)));
+        const response = frequencyResponse();
         frequencies.forEach((frequency, index) => {
             const slider = $(`eq-band-${index}`);
             slider.value = state.gains[index];
@@ -92,7 +100,8 @@
             $(`eq-value-${index}`).textContent = formatDb(state.gains[index]);
             const handle = $(`eq-graph-band-${index}`);
             if (handle) {
-                handle.setAttribute('transform', `translate(${bandX(frequency).toFixed(2)} ${(120 - state.gains[index] * 5).toFixed(2)}) scale(${graphHandleScale().toFixed(4)} 1)`);
+                const graphGain = Math.max(-24, Math.min(24, responseAt(frequency, response)));
+                handle.setAttribute('transform', `translate(${bandX(frequency).toFixed(2)} ${(120 - graphGain * 5).toFixed(2)}) scale(${graphHandleScale().toFixed(4)} 1)`);
                 handle.setAttribute('aria-valuenow', state.gains[index]);
                 handle.setAttribute('aria-valuetext', formatDb(state.gains[index]));
                 handle.classList.toggle('graph-handle-active', state.gains[index] !== 0);
@@ -102,10 +111,9 @@
         $('eq-preamp').setAttribute('aria-valuetext', formatDb(state.preamp));
         $('eq-preamp').style.setProperty('--fill', `${(state.preamp + 24) / 30 * 100}%`);
         $('eq-preamp-value').textContent = formatDb(state.preamp);
-        const response = frequencyResponse();
-        const path = Array.from(response, (gain, i) => `${i ? 'L' : 'M'}${(i / (response.length - 1) * 900).toFixed(2)},${(120 - Math.max(-24, Math.min(24, state.enabled ? gain : 0)) * 5).toFixed(2)}`).join(' ');
+        const path = Array.from(response, (gain, i) => `${i ? 'L' : 'M'}${(i / (response.length - 1) * 900).toFixed(2)},${(120 - Math.max(-24, Math.min(24, gain)) * 5).toFixed(2)}`).join(' ');
         $('eq-curve').setAttribute('d', path);
-        $('eq-graph').setAttribute('aria-label', state.enabled ? `Equalizer response, ${presetName}, preamp ${formatDb(state.preamp)}` : 'Equalizer bypassed, flat response');
+        $('eq-graph').setAttribute('aria-label', `${state.enabled ? 'Equalizer response' : 'Equalizer bypassed, configured response'}, ${presetName}, preamp ${formatDb(state.preamp)}`);
         $('eq-headroom').textContent = !state.enabled ? 'Bypassed for playback and export.' : Math.max(...response) > .2 ? 'Boosts can clip. Use Auto gain for more headroom.' : 'Applied to playback and exports.';
     }
     function apply() {
@@ -157,7 +165,9 @@
     let draggedBand = null, dragOrigin = null, dragFromHandle = false, dragMoved = false;
     function updateGraphBand(event) {
         const { y } = graphPoint(event);
-        setBand(draggedBand, (120 - y) / 5);
+        const targetResponse = (120 - y) / 5;
+        const currentResponse = responseAt(frequencies[draggedBand], frequencyResponse());
+        setBand(draggedBand, state.gains[draggedBand] + targetResponse - currentResponse);
     }
     graph.addEventListener('pointerdown', event => {
         if (event.pointerType === 'mouse' && event.button !== 0) return;

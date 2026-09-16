@@ -334,7 +334,6 @@ dd { margin: 0; white-space: nowrap; }
 .eq-preamp-footer .text-button { padding: .25rem 0; font-size: .625rem; }
 .eq-footnote { align-items: flex-start; margin-top: 1.5rem; color: var(--muted); font-size: .5625rem; line-height: 1.8; }
 .eq-bypassed #eq-curve { stroke: var(--muted); }
-.eq-bypassed .eq-graph-handles { opacity: .6; }
 .eq-bypassed .eq-bands, .eq-bypassed .eq-preamp-section { opacity: .6; }
 @media (max-width: 1100px) { .eq-bottom { grid-template-columns: 1fr; gap: 1.5rem; } .eq-preamp-section { max-width: 25rem; } }
 @media (max-width: 836px) { .eq-bands { grid-template-columns: repeat(5, minmax(0,1fr)); row-gap: 1.5rem; } .eq-band input[type="range"] { height: 7rem; } }
@@ -391,7 +390,6 @@ dd { margin: 0; white-space: nowrap; }
 .distortion-reference { stroke: #c7e1ff80; stroke-dasharray: 5 5; }
 #distortion-curve { stroke: #fff; stroke-width: 2; transition: opacity .2s; }
 .distortion-bypassed #distortion-curve { opacity: .35; }
-.distortion-bypassed .distortion-graph-handle { opacity: .6; }
 .distortion-legend { display: flex; justify-content: space-between; margin-top: .75rem; }
 .distortion-legend span { display: flex; align-items: center; gap: .5rem; }
 .distortion-legend span::before { content: ''; width: 1.25rem; border-top: 1px dashed #c7e1ff80; }
@@ -529,7 +527,6 @@ dd { margin: 0; white-space: nowrap; }
 #delay-repeats { stroke: white; stroke-width: 2; transition: opacity .2s; }
 .delay-bypassed #delay-repeats { opacity: .25; }
 .delay-graph-handle { cursor: move; }
-.delay-bypassed .delay-graph-handles { opacity: .6; }
 .delay-time-axis { display: flex; justify-content: space-between; margin-top: .5rem; }
 .delay-controls { display: grid; gap: 1.5rem; align-content: center; border-left: 1px solid var(--line); padding-left: 2rem; }
 .delay-presets-section { border-top: 1px solid var(--line); padding-top: 1.25rem; }
