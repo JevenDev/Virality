@@ -1,381 +1,234 @@
 (() => {
-    const PSP = (window.PSP = window.PSP || {});
-
-    // export UI visibility
-    function setExportUIVisibility(){
-        PSP.exportBitrateEl.style.display = (PSP.exportFormatEl.value === "mp3") ? "inline-block" : "none";
-    }
-    PSP.exportFormatEl.addEventListener("change", setExportUIVisibility);
-    setExportUIVisibility();
-
-    // export hardening
-    PSP.isExporting = false;
+    const PSP = window.PSP;
+    const libraries = new Map();
+    let hideTimer;
     PSP.exportCancelToken = { cancelled: false };
 
-    function resetCancelButton(){
-        if (!PSP.exportCancelBtn) return;
-        PSP.exportCancelBtn.disabled = !PSP.isExporting;
-        PSP.exportCancelBtn.textContent = "Cancel";
+    function loadLibrary(name, url) {
+        if (window[name]) return Promise.resolve();
+        if (!libraries.has(name)) {
+            libraries.set(name, new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = url;
+                const timeout = setTimeout(() => fail(), 20000);
+                function fail() {
+                    clearTimeout(timeout);
+                    libraries.delete(name);
+                    script.remove();
+                    reject(new Error(`Could not load ${name}. Check your connection and try again.`));
+                }
+                script.onload = () => {
+                    clearTimeout(timeout);
+                    if (window[name]) resolve(); else fail();
+                };
+                script.onerror = fail;
+                document.head.append(script);
+            }));
+        }
+        return libraries.get(name);
     }
-
-    function setExportingState(on){
-        PSP.isExporting = !!on;
-
-        PSP.exportFormatEl.disabled = PSP.isExporting;
-        PSP.exportBitrateEl.disabled = PSP.isExporting;
-        if (PSP.batchBtn) PSP.batchBtn.disabled = PSP.isExporting;
-
-        document.querySelectorAll('.mini[title="Download"], .mini[title="Remove"]').forEach(btn => {
-        btn.disabled = PSP.isExporting;
-        });
-
-        if (PSP.exportCancelBtn) PSP.exportCancelBtn.disabled = !PSP.isExporting;
-        if (!PSP.isExporting) resetCancelButton();
+    function setFormatVisibility() { PSP.exportBitrateEl.hidden = PSP.exportFormatEl.value !== 'mp3'; }
+    PSP.exportFormatEl.addEventListener('change', setFormatVisibility);
+    setFormatVisibility();
+    function setExportingState(on) {
+        PSP.isExporting = Boolean(on);
+        PSP.exportFormatEl.disabled = on;
+        PSP.exportBitrateEl.disabled = on;
+        PSP.batchBtn.disabled = on || !PSP.playlist.length;
+        for (const id of ['add-files', 'browse-files', 'audio-upload']) document.getElementById(id).disabled = on;
+        document.querySelectorAll('.mini[title="Download"], .mini[title="Remove"]').forEach(button => { button.disabled = on; });
+        PSP.exportCancelBtn.disabled = !on;
+        PSP.exportCancelBtn.textContent = 'Cancel';
     }
     PSP.setExportingState = setExportingState;
-
-    function throwIfCancelled(){
+    function throwIfCancelled() {
         if (PSP.exportCancelToken.cancelled) {
-        const err = new Error("Export cancelled");
-        err.name = "ExportCancelled";
-        throw err;
+            const error = new Error('Export cancelled');
+            error.name = 'ExportCancelled';
+            throw error;
         }
     }
-
-    if (PSP.exportCancelBtn){
-        PSP.exportCancelBtn.addEventListener('click', () => {
-        if (!PSP.isExporting) return;
+    PSP.exportCancelBtn.addEventListener('click', () => {
         PSP.exportCancelToken.cancelled = true;
         PSP.exportCancelBtn.disabled = true;
-        PSP.exportCancelBtn.textContent = "Cancelling…";
-        });
+        PSP.exportCancelBtn.textContent = 'Cancelling…';
+    });
+    function safeFilePart(value) { return String(value).replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '') || 'track'; }
+    function exportName(track, settings) { return `[${safeFilePart(settings.preset)}] ${safeFilePart(track.name.replace(/\.[^/.]+$/, ''))}.${settings.format}`; }
+    function uniqueName(filename, used) {
+        let result = filename, suffix = 2;
+        const dot = filename.lastIndexOf('.');
+        while (used.has(result.toLowerCase())) result = `${filename.slice(0, dot)} (${suffix++})${filename.slice(dot)}`;
+        used.add(result.toLowerCase());
+        return result;
     }
-
-    // naming + overlay
-    function safeFilePart(s){
-        return String(s)
-        .replace(/[\\\/:*?"<>|]/g, "_")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
-
-    function stripExtension(filename){
-        const name = String(filename || "");
-        return name.replace(/\.[^/.]+$/, "");
-    }
-
-    function exportNameForTrack(trackTitle){
-        const preset = safeFilePart(PSP.currentPresetName || "Preset");
-        const rawTitle = stripExtension(trackTitle || "track");
-        const title = safeFilePart(rawTitle);
-        const ext = PSP.exportFormatEl.value;
-        return `[${preset}] ${title}.${ext}`;
-    }
-
-    function showExportBar(title){
+    function updateExportBar(title, percent) {
+        const progress = Math.round(Math.max(0, Math.min(100, percent)));
         PSP.exportTitleEl.textContent = title;
-        PSP.exportPctEl.textContent = "0%";
-        PSP.exportFillEl.style.width = "0%";
-        PSP.exportBar.style.display = "block";
-        resetCancelButton();
+        PSP.exportPctEl.textContent = `${progress}%`;
+        PSP.exportFillEl.style.width = `${progress}%`;
+        document.getElementById('export-progress').setAttribute('aria-valuenow', String(progress));
     }
-    function updateExportBar(title, pct){
-        if (title) PSP.exportTitleEl.textContent = title;
-        const p = Math.max(0, Math.min(100, pct || 0));
-        PSP.exportPctEl.textContent = `${Math.round(p)}%`;
-        PSP.exportFillEl.style.width = `${p}%`;
-    }
-    function hideExportBar(){
-        PSP.exportBar.style.display = "none";
-        resetCancelButton();
-    }
-
-    // render/export helpers
-    async function fetchArrayBuffer(url){
-        const res = await fetch(url);
-        return await res.arrayBuffer();
-    }
-
-    async function renderProcessedBuffer(trackUrl, settings, onProgress){
+    const yieldToUI = () => new Promise(resolve => setTimeout(resolve, 0));
+    async function renderProcessedBuffer(track, settings, progress) {
         throwIfCancelled();
-
-        const srcData = await fetchArrayBuffer(trackUrl);
+        let audioBuffer;
+        if (PSP.isLoaded && PSP.playlist[PSP.currentIndex] === track) audioBuffer = PSP.player.buffer.get();
+        else {
+            const response = await fetch(track.url);
+            if (!response.ok) throw new Error(`Could not read ${track.name}.`);
+            audioBuffer = await PSP.context.rawContext.decodeAudioData(await response.arrayBuffer());
+        }
         throwIfCancelled();
-
-        const audioBuffer = await Tone.getContext().rawContext.decodeAudioData(srcData.slice(0));
-        throwIfCancelled();
-
-        const rate = Number(settings.speed) || 1;
-        const wet = Number(settings.mix) || 0;
-        const decay = Number(settings.decay) || 1.5;
-
-        const baseDur = audioBuffer.duration / rate;
-        const tail = Math.min(6, Math.max(1.0, decay * 0.6));
-        const total = baseDur + tail;
-
-        onProgress?.(10);
-
-        const rendered = await Tone.Offline(async () => {
-        const rvb = new Tone.Reverb({ decay, wet }).toDestination();
-        const p = new Tone.Player(audioBuffer).connect(rvb);
-        p.playbackRate = rate;
-        p.start(0);
-        }, total);
-
-        throwIfCancelled();
-        onProgress?.(60);
-
-        return rendered;
+        progress(10);
+        const tail = settings.mix > 0 ? settings.decay + .01 : 0;
+        let player, reverb;
+        try {
+            const rendered = await Tone.Offline(async context => {
+                reverb = new Tone.Reverb({ context, decay: settings.decay, wet: settings.mix }).toDestination();
+                player = new Tone.Player({ context, url: audioBuffer }).connect(reverb);
+                player.playbackRate = settings.speed;
+                await reverb.ready;
+                throwIfCancelled();
+                player.start(0);
+            }, audioBuffer.duration / settings.speed + tail, 2, audioBuffer.sampleRate);
+            throwIfCancelled();
+            progress(60);
+            return rendered;
+        } finally {
+            player?.dispose();
+            reverb?.dispose();
+        }
     }
-
-    function audioBufferToWav(buffer){
-        const numCh = buffer.numberOfChannels;
+    async function audioBufferToWav(buffer, progress) {
+        const channels = buffer.numberOfChannels;
         const sampleRate = buffer.sampleRate;
         const length = buffer.length;
-        const bytesPerSample = 2;
-        const blockAlign = numCh * bytesPerSample;
-        const byteRate = sampleRate * blockAlign;
+        const blockAlign = channels * 2;
         const dataSize = length * blockAlign;
-
-        const buf = new ArrayBuffer(44 + dataSize);
-        const view = new DataView(buf);
-
-        const writeStr = (off, str) => { for (let i=0;i<str.length;i++) view.setUint8(off+i, str.charCodeAt(i)); };
-
-        writeStr(0, "RIFF");
+        const output = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(output);
+        const write = (offset, text) => { for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i)); };
+        write(0, 'RIFF');
         view.setUint32(4, 36 + dataSize, true);
-        writeStr(8, "WAVE");
-        writeStr(12, "fmt ");
+        write(8, 'WAVE');
+        write(12, 'fmt ');
         view.setUint32(16, 16, true);
         view.setUint16(20, 1, true);
-        view.setUint16(22, numCh, true);
+        view.setUint16(22, channels, true);
         view.setUint32(24, sampleRate, true);
-        view.setUint32(28, byteRate, true);
+        view.setUint32(28, sampleRate * blockAlign, true);
         view.setUint16(32, blockAlign, true);
         view.setUint16(34, 16, true);
-        writeStr(36, "data");
+        write(36, 'data');
         view.setUint32(40, dataSize, true);
-
+        const data = Array.from({ length: channels }, (_, channel) => buffer.getChannelData(channel));
         let offset = 44;
-        const chData = [];
-        for (let c=0;c<numCh;c++) chData.push(buffer.getChannelData(c));
-
-        for (let i=0;i<length;i++){
-        for (let c=0;c<numCh;c++){
-            let s = chData[c][i];
-            s = Math.max(-1, Math.min(1, s));
-            view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-            offset += 2;
+        for (let start = 0; start < length; start += 65536) {
+            throwIfCancelled();
+            const end = Math.min(length, start + 65536);
+            for (let i = start; i < end; i++) {
+                for (let channel = 0; channel < channels; channel++) {
+                    const sample = Math.max(-1, Math.min(1, data[channel][i]));
+                    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+                    offset += 2;
+                }
+            }
+            progress(60 + end / length * 40);
+            await yieldToUI();
         }
-        }
-
-        return new Blob([buf], { type:"audio/wav" });
+        return new Blob([output], { type: 'audio/wav' });
     }
-
-    function audioBufferToMp3(buffer, kbps, onProgress){
-        if (!window.lamejs) throw new Error("MP3 encoder not loaded.");
-
-        const numCh = buffer.numberOfChannels;
-        const sampleRate = buffer.sampleRate;
-        const bitrate = Number(kbps) || 192;
-
-        const mp3enc = new lamejs.Mp3Encoder(numCh, sampleRate, bitrate);
-
+    async function audioBufferToMp3(buffer, bitrate, progress) {
+        const channels = Math.min(2, buffer.numberOfChannels);
+        const encoder = new lamejs.Mp3Encoder(channels, buffer.sampleRate, bitrate);
         const left = buffer.getChannelData(0);
-        const right = (numCh > 1) ? buffer.getChannelData(1) : null;
-
+        const right = channels > 1 ? buffer.getChannelData(1) : null;
+        const data = [];
         const blockSize = 1152;
-        let mp3Data = [];
-
-        const floatTo16 = (f) => {
-        const v = Math.max(-1, Math.min(1, f));
-        return v < 0 ? (v * 0x8000) : (v * 0x7FFF);
-        };
-
-        const totalBlocks = Math.ceil(left.length / blockSize);
-
-        for (let b=0; b<totalBlocks; b++){
+        const to16 = value => { const sample = Math.max(-1, Math.min(1, value)); return sample < 0 ? sample * 0x8000 : sample * 0x7fff; };
+        for (let start = 0, block = 0; start < left.length; start += blockSize, block++) {
+            throwIfCancelled();
+            const length = Math.min(blockSize, left.length - start);
+            const l = new Int16Array(length);
+            const r = right ? new Int16Array(length) : null;
+            for (let i = 0; i < length; i++) { l[i] = to16(left[start + i]); if (r) r[i] = to16(right[start + i]); }
+            const chunk = r ? encoder.encodeBuffer(l, r) : encoder.encodeBuffer(l);
+            if (chunk.length) data.push(new Uint8Array(chunk));
+            // yield between encoding batches so progress and cancellation remain interactive
+            if (block % 24 === 0) { progress(60 + start / left.length * 39); await yieldToUI(); }
+        }
         throwIfCancelled();
-
-        const start = b * blockSize;
-        const end = Math.min(left.length, start + blockSize);
-
-        const l = new Int16Array(end - start);
-        const r = (numCh > 1) ? new Int16Array(end - start) : null;
-
-        for (let i=0;i<l.length;i++){
-            l[i] = floatTo16(left[start + i]);
-            if (r) r[i] = floatTo16(right[start + i]);
-        }
-
-        const chunk = (numCh > 1) ? mp3enc.encodeBuffer(l, r) : mp3enc.encodeBuffer(l);
-        if (chunk.length) mp3Data.push(new Uint8Array(chunk));
-
-        if (onProgress) {
-            const pct = 60 + (b / totalBlocks) * 35;
-            onProgress(pct);
-        }
-        }
-
-        const end = mp3enc.flush();
-        if (end.length) mp3Data.push(new Uint8Array(end));
-
-        onProgress?.(100);
-        return new Blob(mp3Data, { type:"audio/mpeg" });
+        const final = encoder.flush();
+        if (final.length) data.push(new Uint8Array(final));
+        progress(100);
+        return new Blob(data, { type: 'audio/mpeg' });
     }
-
-    function triggerDownload(blob, filename){
+    async function exportTrackToBlob(track, settings, progress) {
+        const rendered = await renderProcessedBuffer(track, settings, progress);
+        try {
+            return settings.format === 'wav' ? await audioBufferToWav(rendered, progress) : await audioBufferToMp3(rendered, settings.bitrate, progress);
+        } finally { rendered.dispose(); }
+    }
+    function triggerDownload(blob, filename) {
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
     }
-
-    async function exportTrackToBlob(track, settings, onProgress){
-        throwIfCancelled();
-
-        const fmt = PSP.exportFormatEl.value;
-        const kbps = Number(PSP.exportBitrateEl.value) || 192;
-
-        const rendered = await renderProcessedBuffer(track.url, settings, (p) => {
-        throwIfCancelled();
-        onProgress?.(p);
-        });
-
-        throwIfCancelled();
-
-        if (fmt === "wav") {
-        onProgress?.(85);
-        const wavBlob = audioBufferToWav(rendered);
-        onProgress?.(100);
-        return wavBlob;
-        } else {
-        return audioBufferToMp3(rendered, kbps, (p) => {
+    async function runExport(tracks, batch) {
+        if (PSP.isExporting || !tracks.length) return;
+        const settings = { ...PSP.currentSettings(), preset: PSP.currentPresetName, format: PSP.exportFormatEl.value, bitrate: Number(PSP.exportBitrateEl.value) };
+        clearTimeout(hideTimer);
+        PSP.exportCancelToken = { cancelled: false };
+        setExportingState(true);
+        PSP.exportBar.hidden = false;
+        updateExportBar('Preparing export…', 0);
+        try {
+            await PSP.ensureAudio();
+            if (settings.format === 'mp3') await loadLibrary('lamejs', 'https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js');
+            if (batch) await loadLibrary('JSZip', 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
             throwIfCancelled();
-            onProgress?.(p);
-        });
+            const zip = batch ? new JSZip() : null;
+            const used = new Set();
+            for (let i = 0; i < tracks.length; i++) {
+                const filename = uniqueName(exportName(tracks[i], settings), used);
+                const blob = await exportTrackToBlob(tracks[i], settings, percent => {
+                    updateExportBar(`Exporting ${i + 1}/${tracks.length}: ${tracks[i].name}`, (i + percent / 100) / tracks.length * (batch ? 95 : 100));
+                });
+                throwIfCancelled();
+                if (zip) zip.file(filename, blob); else triggerDownload(blob, filename);
+            }
+            if (zip) {
+                const blob = await zip.generateAsync({ type: 'blob' }, metadata => {
+                    throwIfCancelled();
+                    updateExportBar('Creating ZIP…', 95 + metadata.percent * .05);
+                });
+                throwIfCancelled();
+                triggerDownload(blob, `${safeFilePart(settings.preset)} batch download.zip`);
+            }
+            updateExportBar('Export complete. Your download is ready.', 100);
+        } catch (error) {
+            if (error.name === 'ExportCancelled') updateExportBar('Export cancelled', 0);
+            else {
+                console.error('Audio export failed:', error);
+                updateExportBar('Export failed. Try another file or format.', 0);
+                PSP.notify(error.message || 'Could not export audio. Try another file or format.');
+            }
+        } finally {
+            setExportingState(false);
+            hideTimer = setTimeout(() => { PSP.exportBar.hidden = true; }, 3500);
         }
     }
-
-    async function downloadOne(index){
-        if (PSP.isExporting) return;
-        if (index < 0 || index >= PSP.playlist.length) return;
-
+    window.downloadOne = index => {
         const track = PSP.playlist[index];
-        const filename = exportNameForTrack(track.name);
-        const settings = PSP.currentSettings();
-
-        PSP.exportCancelToken = { cancelled: false };
-        setExportingState(true);
-
-        try{
-        showExportBar(`Exporting ${filename}`);
-        updateExportBar(`Exporting ${filename}`, 0);
-
-        throwIfCancelled();
-
-        const blob = await exportTrackToBlob(track, settings, (p) => {
-            updateExportBar(`Exporting ${filename}`, p);
-        });
-
-        throwIfCancelled();
-
-        triggerDownload(blob, filename);
-        updateExportBar(`Finished ${filename}`, 100);
-        setTimeout(hideExportBar, 700);
-
-        } catch (err){
-        console.error(err);
-
-        if (err && err.name === "ExportCancelled") {
-            updateExportBar(`Cancelled: ${filename}`, 100);
-            setTimeout(hideExportBar, 600);
-        } else {
-            updateExportBar(`Export failed: ${track.name}`, 100);
-            setTimeout(hideExportBar, 1200);
-            alert("Export failed. Check console for details.");
-        }
-        } finally {
-        setExportingState(false);
-        resetCancelButton();
-        }
-    }
-
-    async function batchDownload(){
-        if (PSP.isExporting) return;
-        if (!PSP.playlist.length) return;
-
-        const settings = PSP.currentSettings();
-        const preset = safeFilePart(PSP.currentPresetName || "Preset");
-        const zipName = `${preset} batch download.zip`;
-
-        const zip = new JSZip();
-
-        PSP.exportCancelToken = { cancelled: false };
-        setExportingState(true);
-
-        try{
-        showExportBar(`Batch exporting: ${zipName}`);
-        updateExportBar(`Batch exporting: ${zipName}`, 0);
-
-        for (let i=0;i<PSP.playlist.length;i++){
-            throwIfCancelled();
-
-            const track = PSP.playlist[i];
-            const filename = exportNameForTrack(track.name);
-
-            const base = (i / PSP.playlist.length) * 100;
-            const span = (1 / PSP.playlist.length) * 100;
-
-            const blob = await exportTrackToBlob(track, settings, (p) => {
-            const overall = base + (p/100) * span;
-            updateExportBar(`Exporting ${filename}`, overall);
-            });
-
-            throwIfCancelled();
-            zip.file(filename, blob);
-        }
-
-        throwIfCancelled();
-        updateExportBar(`Zipping…`, 98);
-
-        const zipBlob = await zip.generateAsync({ type:"blob" }, (meta) => {
-            throwIfCancelled();
-            const pct = 98 + (meta.percent * 0.02);
-            updateExportBar(`Zipping…`, pct);
-        });
-
-        throwIfCancelled();
-
-        triggerDownload(zipBlob, zipName);
-        updateExportBar(`Finished ${zipName}`, 100);
-        setTimeout(hideExportBar, 900);
-
-        } catch (err){
-        console.error(err);
-
-        if (err && err.name === "ExportCancelled") {
-            updateExportBar(`Cancelled: ${zipName}`, 100);
-            setTimeout(hideExportBar, 700);
-        } else {
-            updateExportBar(`Batch export failed`, 100);
-            setTimeout(hideExportBar, 1200);
-            alert("Batch export failed. Check console for details.");
-        }
-        } finally {
-        setExportingState(false);
-        resetCancelButton();
-        }
-    }
-
-    // expose for inline onclicks
-    window.downloadOne = downloadOne;
-    window.batchDownload = batchDownload;
-
-    // if app.js already rendered list before export.js loaded, re-apply disabled state
-    if (typeof PSP.renderList === "function") PSP.renderList();
+        if (track) return runExport([track], false);
+    };
+    window.batchDownload = () => runExport([...PSP.playlist], true);
+    PSP.batchBtn.addEventListener('click', window.batchDownload);
+    setExportingState(false);
 })();
