@@ -1,34 +1,34 @@
 # Virality
-_BY JEVEN RANDHAWA_
 
-# [See it in action](https://jevendev.github.io/Virality/)
-<img width="1920" height="1080" alt="ViralityScreenshot" src="https://github.com/user-attachments/assets/0416fda9-0775-4f52-a1f4-0d8ad66b51c2"/>
+Virality is a private, browser-based audio editor for slowed + reverb, nightcore, and custom sound design. Import a track, shape the sound with effects, preview the result, and export it without uploading your audio.
 
-### ABOUT
-Virality is a browser-based tool for editing and exporting audio with the **slowed + reverb** and **nightcore** effects. No installs, no fees, just drag a file in and start tweaking.
+[Open Virality](https://jevendev.github.io/Virality/)
 
-*  Preview audio instantly in the browser
-*  Adjust speed, reverb mix, and reverb decay live
-*  Apply built-in presets (Default, Slowed + Reverb, Nightcore) or create your own
-*  Export to WAV or MP3 (single file or batch ZIP)
-*  Custom waveform visualization with scrubbing
+![Virality audio editor interface](assets/virality-preview.png)
 
----
+## Features
 
-### WHY DID YOU MAKE THIS ???
-I got tired of sites that paywalled the basic feature of batch downloading more than 1 file. I wanted a simple, self-contained tool that didn’t require DAWs, plug-ins, or sketchy mobile apps. I’m a designer first, but I love music production and often experiment with slowed/nightcore edits. This project gave me a way to combine design + coding into something I can actually use.
+- Import one or more MP3, WAV, FLAC, M4A, OGG, and other browser-supported audio files
+- Adjust playback speed, pitch, reverb mix, and reverb decay
+- Shape the effect chain with an equalizer, delay, and distortion
+- Preview edits with waveform scrubbing, track controls, repeat, and independent preview volume
+- Use built-in sound presets or create, edit, import, and export your own
+- Customize the interface colors and save portable background presets
+- Undo and redo sound edits, or save the complete workspace as a session file
+- Export individual tracks or the full library as WAV or MP3
+- Measure integrated loudness, loudness range, true peak, and loudness over time with the built-in LUFS checker
+- Navigate playback and editing controls with keyboard shortcuts
 
----
+## Privacy
 
-### FEATURES
-* **Drag & Drop**: Add single or multiple files at a time
-* **Live Playback**: Scrub, play/pause, skip, and rewind
-* **Presets**: Default, Slowed + Reverb, Nightcore
-* **Custom Presets**: Save your own sliders locally (Alt+Click to delete)
-* **Export**: WAV (faster but more storage) or MP3 (with selectable bitrate), plus batch ZIP download
-* **Visualizer**: Reactive audio visualizer
+Audio processing and loudness analysis happen locally in your browser. Virality does not upload your tracks to an external server.
 
----
+## Why I made it
 
-### DISCLAIMER
-All processing happens locally in your browser. Nothing is uploaded.
+Many simple audio-effect sites place basic workflows, especially batch exports, behind a paywall. I wanted a focused tool that did not require a DAW, plug-ins, or a mobile app. Virality combines my interest in interface design and music production in something practical that I can use every day.
+
+## License
+
+Virality is available under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+
+Created by [JVN!](https://github.com/JevenDev).
