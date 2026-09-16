@@ -84,22 +84,24 @@
         progress(10);
         const tail = PSP.processingTail(settings);
         let player, processing;
+        const context = new Tone.OfflineContext(new OfflineAudioContext(2,
+            Math.ceil((audioBuffer.duration / settings.speed + tail) * audioBuffer.sampleRate), audioBuffer.sampleRate));
         try {
-            const rendered = await Tone.Offline(async context => {
-                processing = PSP.createProcessingChain(context, settings);
-                processing.output.toDestination();
-                player = new Tone.Player({ context, url: audioBuffer }).connect(processing.input);
-                player.playbackRate = settings.speed;
-                await processing.ready;
-                throwIfCancelled();
-                player.start(0);
-            }, audioBuffer.duration / settings.speed + tail, 2, audioBuffer.sampleRate);
+            processing = PSP.createProcessingChain(context, settings);
+            processing.output.toDestination();
+            player = new Tone.Player({ context, url: audioBuffer }).connect(processing.input);
+            player.playbackRate = settings.speed;
+            await processing.ready;
+            throwIfCancelled();
+            player.start(0);
+            const rendered = await context.render();
             throwIfCancelled();
             progress(60);
             return rendered;
         } finally {
             player?.dispose();
             processing?.dispose();
+            context.dispose();
         }
     }
     async function audioBufferToWav(buffer, progress) {

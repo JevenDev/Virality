@@ -1,7 +1,6 @@
 (() => {
     const PSP = window.PSP;
-    const pitchModules = new WeakMap();
-    const pitchProcessorURL = new URL('./vendor/soundtouch-processor.js', document.currentScript.src).href;
+    const pitchProcessorURL = new URL('./vendor/SignalsmithStretch.js', document.currentScript.src).href;
     function createPitch(context, settings) {
         const input = new Tone.Gain({ context });
         const output = new Tone.Gain({ context });
@@ -10,10 +9,13 @@
         input.connect(dry);
         dry.connect(output);
         wet.connect(output);
-        let node, silence, ready, disposed = false, pitch = settings.pitch ?? 0;
+        let node, silence, ready, scheduled, disposed = false, pitch = settings.pitch ?? 0, nodePitch;
         function route(immediate) {
             const shifted = node && pitch !== 0 ? 1 : 0;
-            if (node) node.parameters.get('pitchSemitones').value = pitch;
+            if (node && nodePitch !== pitch) {
+                nodePitch = pitch;
+                scheduled = node.schedule({ active: true, semitones: pitch, output: context.immediate() });
+            }
             if (immediate) {
                 dry.gain.value = 1 - shifted;
                 wet.gain.value = shifted;
@@ -24,17 +26,15 @@
         }
         function prepare() {
             if (ready || pitch === 0) return;
-            if (!pitchModules.has(context)) {
-                const loading = context.addAudioWorkletModule(pitchProcessorURL);
-                pitchModules.set(context, loading);
-                loading.catch(() => pitchModules.delete(context));
-            }
-            ready = pitchModules.get(context).then(() => {
-                if (disposed) return;
-                node = context.createAudioWorkletNode('soundtouch-processor', {
+            ready = Promise.resolve().then(() => {
+                if (!window.SignalsmithStretch) throw new Error('The pitch engine could not load. Reload the page to try again.');
+                SignalsmithStretch.moduleUrl = pitchProcessorURL;
+                return SignalsmithStretch(context.rawContext, {
                     numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2]
                 });
-                node.port.postMessage({ type: 'set-stretch-parameters', params: { quickSeek: false } });
+            }).then(async created => {
+                if (disposed) { created.disconnect(); created.port.close(); return; }
+                node = created;
                 node.onprocessorerror = () => PSP.notify('Pitch processing stopped. Reload the page to try again.');
                 // keep feeding silence so buffered audio drains after the source stops
                 silence = context.createConstantSource();
@@ -44,6 +44,7 @@
                 input.connect(node);
                 Tone.connect(node, wet);
                 route(true);
+                await scheduled;
             });
             ready.catch(error => {
                 ready = null;
@@ -56,7 +57,7 @@
         prepare();
         return {
             input, output,
-            get ready() { return ready; },
+            get ready() { return Promise.all([ready, scheduled]); },
             update(next, immediate = false) {
                 pitch = next.pitch ?? 0;
                 prepare();

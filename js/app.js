@@ -124,7 +124,8 @@
     PSP.ensureAudio = async () => {
         if (!window.Tone) throw new Error('The audio engine could not load. Check your connection and reload.');
         if (!audioReady) {
-            PSP.context = Tone.getContext();
+            PSP.context = new Tone.Context({ context: new AudioContext() });
+            Tone.setContext(PSP.context);
             audioReady = (async () => {
                 PSP.output = new Tone.Gain({ context: PSP.context, gain: Number($('volume-slider').value) / 100 }).toDestination();
                 PSP.processing = PSP.createProcessingChain(PSP.context, PSP.captureSettings());
