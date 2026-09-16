@@ -17,6 +17,12 @@
             }
         },
         {
+            id: 'interstellar', name: 'Interstellar', settings: {
+                mode: 'gradient', angle: 155, start: '#0040ff', middle: '#000000', end: '#171717',
+                field: '#171717', surface: '#171717', popup: '#171717', dock: '#171717', drop: '#171717', cursor: '#f1f3f4'
+            }
+        },
+        {
             id: 'aubergine', name: 'Aubergine', settings: {
                 mode: 'gradient', angle: 150, start: '#211326', middle: '#452342', end: '#7b405c',
                 field: '#562b51', surface: '#2d1832', popup: '#3a2040', dock: '#25142a', drop: '#452342', cursor: '#ffd7e7'
