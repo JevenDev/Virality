@@ -2,6 +2,12 @@
     const PSP = (window.PSP = window.PSP || {});
     const $ = id => document.getElementById(id);
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    document.addEventListener('dblclick', event => {
+        if (event.target.type !== 'range') return;
+        event.target.value = event.target.defaultValue;
+        event.target.dispatchEvent(new Event('input', { bubbles: true }));
+        event.target.dispatchEvent(new Event('change', { bubbles: true }));
+    });
     Object.assign(PSP, {
         playlist: [], currentIndex: -1, isLoaded: false, isPlaying: false,
         isLoading: false, isExporting: false, audioOffset: 0, startedAt: 0,

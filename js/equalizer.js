@@ -244,7 +244,6 @@
             presetName = 'Custom';
             apply();
         });
-        slider.addEventListener('dblclick', () => { state.gains[index] = 0; presetName = 'Custom'; apply(); });
         const label = document.createElement('label');
         label.htmlFor = slider.id;
         label.textContent = labels[index];
