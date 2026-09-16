@@ -6,12 +6,13 @@
     <meta name="theme-color" content="#07358d">
     <meta name="description" content="A PSP-inspired audio editor for slowed + reverb, nightcore, and local WAV and MP3 exports.">
     <title>Virality · Audio editor</title>
-    <link rel="stylesheet" href="./style.css?v=2.7">
+    <link rel="stylesheet" href="./style.css?v=2.8">
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script defer src="./js/bg-waves.js?v=2.0"></script>
-    <script defer src="./js/equalizer.js?v=1.0"></script>
-    <script defer src="./js/app.js?v=2.2"></script>
-    <script defer src="./js/export.js?v=2.1"></script>
+    <script defer src="./js/equalizer.js?v=1.1"></script>
+    <script defer src="./js/audio-chain.js?v=1.0"></script>
+    <script defer src="./js/app.js?v=2.3"></script>
+    <script defer src="./js/export.js?v=2.2"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
     <script defer src="./js/dock.js?v=2.5"></script>
 </head>
@@ -47,6 +48,10 @@
     </nav>
     <div class="psp-container">
         <header class="site-header"><a class="wordmark" href="./" aria-label="Virality home">virality</a><div class="header-right"><time class="system-clock" id="system-clock" aria-label="Current date and time"></time><button id="help-button" class="text-button" aria-label="Keyboard shortcuts">?</button></div></header>
+        <section class="workspace" aria-label="Current track">
+            <div class="workspace-toolbar"><div class="workspace-track"><label for="workspace-track">Editing</label><select id="workspace-track" aria-label="Track to edit"><option value="">No track selected</option></select></div><button class="btn" id="workspace-play" aria-label="Play selected track" disabled>Play</button><button class="btn" id="workspace-add">Add audio</button><div class="workspace-export"><label for="export-format">Export as</label><select id="export-format"><option value="wav">WAV</option><option value="mp3">MP3</option></select><select id="export-bitrate" aria-label="MP3 bitrate" hidden><option value="128">128 kbps</option><option value="160">160 kbps</option><option value="192" selected>192 kbps</option><option value="256">256 kbps</option><option value="320">320 kbps</option></select><button class="btn" id="workspace-export" disabled>Export track</button></div></div>
+            <div class="workspace-effects"><span>Effects</span><div id="workspace-chain" aria-label="Processing order"><span>Original sound</span></div></div>
+        </section>
         <main class="page-stack">
             <section class="tool-page" id="music-page" role="tabpanel" aria-labelledby="dock-music">
                 <nav class="xmb-nav" aria-label="Editor sections"><a href="#player" class="selected"><svg class="icon"><use href="#i-music"/></svg><span>Music</span></a><a href="#effects"><svg class="icon"><use href="#i-sliders"/></svg><span>Effects</span></a><a href="#library"><svg class="icon"><use href="#i-library"/></svg><span>Library</span></a></nav>
@@ -79,12 +84,11 @@
                     <div class="library-toolbar"><div class="library-heading"><svg class="icon"><use href="#i-library"/></svg><h2 id="library-title">Your library</h2><span id="track-count">0 tracks</span></div><button class="btn" id="add-files"><svg class="icon"><use href="#i-plus"/></svg>Add audio</button></div>
                     <div class="empty-library" id="empty-library"><svg class="icon"><use href="#i-music"/></svg><div><h3>Drop audio files here</h3><p>or <button class="inline-button" id="browse-files">browse files</button></p><span>MP3, WAV, FLAC, M4A, OGG &amp; more</span></div></div>
                     <div id="file-rows" role="list" aria-label="Audio tracks"></div>
-                    <div class="export-controls"><p>© JVN 2026</p><div class="export-options"><label for="export-format">Export as</label><select id="export-format"><option value="wav">WAV</option><option value="mp3">MP3</option></select><select id="export-bitrate" aria-label="MP3 bitrate" hidden><option value="128">128 kbps</option><option value="160">160 kbps</option><option value="192" selected>192 kbps</option><option value="256">256 kbps</option><option value="320">320 kbps</option></select><button class="btn primary" id="batch-btn" disabled><svg class="icon"><use href="#i-download"/></svg>Export all</button></div></div>
+                    <div class="export-controls"><p>© JVN 2026</p><div class="export-options"><button class="btn primary" id="batch-btn" disabled><svg class="icon"><use href="#i-download"/></svg>Export all</button></div></div>
                 </section>
             </section>
             <section class="tool-page eq-page" id="equalizer" role="tabpanel" aria-labelledby="dock-equalizer" hidden inert>
                 <div class="eq-heading"><div class="eq-title"><svg class="icon" aria-hidden="true"><use href="#i-equalizer"/></svg><h1>Equalizer</h1></div><div class="eq-actions"><button class="btn" id="eq-enabled" aria-pressed="true">EQ on</button><button class="text-button" id="eq-reset">Reset EQ</button></div></div>
-                <div class="eq-preview"><div><span class="eq-preview-label">Preview</span><p id="eq-track-name">No track loaded</p></div><button class="btn" id="eq-play" aria-label="Play preview" disabled>Play</button><button class="btn" id="eq-add-audio">Add audio</button></div>
                 <div class="eq-response"><div class="eq-db-axis" aria-hidden="true"><span>+24 dB</span><span>0</span><span>−24 dB</span></div><div class="eq-plot"><svg id="eq-graph" viewBox="0 0 900 240" preserveAspectRatio="none" role="img" aria-label="Equalizer frequency response"><path class="eq-grid" d="M0 0H900 M0 60H900 M0 180H900 M0 240H900 M0 0V240 M210 0V240 M510 0V240 M810 0V240 M900 0V240"/><path class="eq-zero" d="M0 120H900"/><path id="eq-curve" d="M0 120H900"/></svg><div class="eq-frequency-axis" aria-hidden="true"><span>20 Hz</span><span>100</span><span>1k</span><span>10k</span><span>20k</span></div></div></div>
                 <div class="eq-band-heading"><h2>Frequency bands</h2><span>±12 dB</span></div>
                 <div class="eq-bands" id="eq-bands" role="group" aria-label="Equalizer frequency bands"></div>

@@ -36,7 +36,18 @@
             dispose() { input.dispose(); filters.forEach(filter => filter.dispose()); }
         };
     }
-    PSP.eq = { snapshot: () => ({ ...state, gains: [...state.gains] }), createChain };
+    PSP.eq = {
+        defaults: () => ({ enabled: true, gains: frequencies.map(() => 0), preamp: 0, preset: 'Flat' }),
+        snapshot: () => ({ ...state, gains: [...state.gains], preset: presetName }),
+        restore(settings) {
+            state.enabled = settings.enabled;
+            state.gains = [...settings.gains];
+            state.preamp = settings.preamp;
+            presetName = settings.preset;
+            render();
+        },
+        createChain
+    };
 
     function frequencyResponse(includePreamp = true) {
         const sampleRate = PSP.context?.sampleRate || 48000;
@@ -86,7 +97,8 @@
         $('eq-headroom').textContent = !state.enabled ? 'Bypassed for playback and export.' : Math.max(...response) > .2 ? 'Boosts can clip. Use Auto gain for more headroom.' : 'Applied to playback and exports.';
     }
     function apply() {
-        PSP.equalizer?.update(state);
+        PSP.processing?.update(PSP.captureSettings());
+        PSP.saveCurrentSettings();
         render();
     }
     const bands = document.createDocumentFragment();
@@ -141,16 +153,6 @@
         presetName = 'Flat';
         apply();
     });
-    $('eq-play').addEventListener('click', () => window.mediaToggle());
-    $('eq-add-audio').addEventListener('click', () => $('audio-upload').click());
-    document.addEventListener('playbackchange', () => {
-        const track = PSP.playlist[PSP.currentIndex];
-        $('eq-track-name').textContent = track ? track.name : 'No track loaded';
-        $('eq-track-name').title = track?.name || '';
-        $('eq-play').disabled = !PSP.isLoaded;
-        $('eq-play').textContent = PSP.isPlaying ? 'Pause' : 'Play';
-        $('eq-play').setAttribute('aria-label', PSP.isPlaying ? 'Pause preview' : 'Play preview');
-        render();
-    });
+    document.addEventListener('playbackchange', render);
     render();
 })();

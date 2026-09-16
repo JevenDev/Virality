@@ -35,10 +35,11 @@
         PSP.exportFormatEl.disabled = on;
         PSP.exportBitrateEl.disabled = on;
         PSP.batchBtn.disabled = on || !PSP.playlist.length;
-        for (const id of ['add-files', 'browse-files', 'eq-add-audio', 'audio-upload']) document.getElementById(id).disabled = on;
+        for (const id of ['add-files', 'browse-files', 'workspace-add', 'audio-upload']) document.getElementById(id).disabled = on;
         document.querySelectorAll('.mini[title="Download"], .mini[title="Remove"]').forEach(button => { button.disabled = on; });
         PSP.exportCancelBtn.disabled = !on;
         PSP.exportCancelBtn.textContent = 'Cancel';
+        PSP.updateWorkspace();
     }
     PSP.setExportingState = setExportingState;
     function throwIfCancelled() {
@@ -81,16 +82,15 @@
         }
         throwIfCancelled();
         progress(10);
-        const tail = settings.mix > 0 ? settings.decay + .01 : 0;
-        let player, reverb, equalizer;
+        const tail = PSP.processingTail(settings);
+        let player, processing;
         try {
             const rendered = await Tone.Offline(async context => {
-                reverb = new Tone.Reverb({ context, decay: settings.decay, wet: settings.mix }).toDestination();
-                equalizer = PSP.eq.createChain(context, settings.eq);
-                equalizer.output.connect(reverb);
-                player = new Tone.Player({ context, url: audioBuffer }).connect(equalizer.input);
+                processing = PSP.createProcessingChain(context, settings);
+                processing.output.toDestination();
+                player = new Tone.Player({ context, url: audioBuffer }).connect(processing.input);
                 player.playbackRate = settings.speed;
-                await reverb.ready;
+                await processing.ready;
                 throwIfCancelled();
                 player.start(0);
             }, audioBuffer.duration / settings.speed + tail, 2, audioBuffer.sampleRate);
@@ -99,8 +99,7 @@
             return rendered;
         } finally {
             player?.dispose();
-            equalizer?.dispose();
-            reverb?.dispose();
+            processing?.dispose();
         }
     }
     async function audioBufferToWav(buffer, progress) {
@@ -185,7 +184,10 @@
     }
     async function runExport(tracks, batch) {
         if (PSP.isExporting || !tracks.length) return;
-        const settings = { ...PSP.currentSettings(), eq: PSP.eq.snapshot(), preset: PSP.currentPresetName, format: PSP.exportFormatEl.value, bitrate: Number(PSP.exportBitrateEl.value) };
+        PSP.saveCurrentSettings();
+        const format = PSP.exportFormatEl.value;
+        const bitrate = Number(PSP.exportBitrateEl.value);
+        const jobs = tracks.map(track => ({ track, settings: { ...structuredClone(track.settings), format, bitrate } }));
         clearTimeout(hideTimer);
         PSP.exportCancelToken = { cancelled: false };
         setExportingState(true);
@@ -193,14 +195,15 @@
         updateExportBar('Preparing export…', 0);
         try {
             await PSP.ensureAudio();
-            if (settings.format === 'mp3') await loadLibrary('lamejs', 'https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js');
+            if (format === 'mp3') await loadLibrary('lamejs', 'https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js');
             if (batch) await loadLibrary('JSZip', 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
             throwIfCancelled();
             const zip = batch ? new JSZip() : null;
             const used = new Set();
             for (let i = 0; i < tracks.length; i++) {
-                const filename = uniqueName(exportName(tracks[i], settings), used);
-                const blob = await exportTrackToBlob(tracks[i], settings, percent => {
+                const { track, settings } = jobs[i];
+                const filename = uniqueName(exportName(track, settings), used);
+                const blob = await exportTrackToBlob(track, settings, percent => {
                     updateExportBar(`Exporting ${i + 1}/${tracks.length}: ${tracks[i].name}`, (i + percent / 100) / tracks.length * (batch ? 95 : 100));
                 });
                 throwIfCancelled();
@@ -212,7 +215,7 @@
                     updateExportBar('Creating ZIP…', 95 + metadata.percent * .05);
                 });
                 throwIfCancelled();
-                triggerDownload(blob, `${safeFilePart(settings.preset)} batch download.zip`);
+                triggerDownload(blob, 'Virality exports.zip');
             }
             updateExportBar('Export complete. Your download is ready.', 100);
         } catch (error) {

@@ -16,7 +16,7 @@
     const ctx = canvas.getContext('2d');
     let canvasWidth = 0, canvasHeight = 0, frame = 0, lastFrame = 0;
     let loadVersion = 0, loadController = null, audioReady = null;
-    let decayTimer, noticeTimer, dragDepth = 0, previousVolume = 80;
+    let noticeTimer, dragDepth = 0, previousVolume = 80;
     let selectedPreset = 'default';
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     PSP.fmt = seconds => {
@@ -43,11 +43,64 @@
         return svg;
     }
     function trackMeta(track) {
-        return `${track.name.split('.').pop().toUpperCase()} · ${(track.size / 1048576).toFixed(1)} MB${track.duration ? ` · ${PSP.fmt(track.duration)}` : ''}`;
+        const count = track.settings ? PSP.describeEffects(track.settings).filter(effect => effect.active).length : 0;
+        return `${track.name.split('.').pop().toUpperCase()} · ${(track.size / 1048576).toFixed(1)} MB${track.duration ? ` · ${PSP.fmt(track.duration)}` : ''}${count ? ` · ${count} ${count === 1 ? 'effect' : 'effects'}` : ''}`;
     }
     PSP.dur = () => PSP.isLoaded ? PSP.player.buffer.duration : 0;
     PSP.currentAudioPos = () => PSP.audioOffset + (PSP.isPlaying ? (PSP.context.now() - PSP.startedAt) * PSP.lastKnownRate : 0);
     PSP.currentSettings = () => ({ speed: Number(PSP.speedS.value), mix: Number(PSP.mixS.value), decay: Number(PSP.decayS.value) });
+    PSP.defaultSettings = () => ({ speed: 1, mix: 0, decay: 2, eq: PSP.eq.defaults(), preset: 'Default', presetId: 'default' });
+    PSP.captureSettings = () => ({ ...PSP.currentSettings(), eq: PSP.eq.snapshot(), preset: PSP.currentPresetName, presetId: selectedPreset });
+    PSP.saveCurrentSettings = () => {
+        const track = PSP.playlist[PSP.currentIndex];
+        if (track) {
+            track.settings = PSP.captureSettings();
+            const meta = document.querySelector('.file-item.active-track .track-meta');
+            if (!track.error) {
+                if (meta) meta.textContent = trackMeta(track);
+                $('track-detail').textContent = trackMeta(track);
+            }
+        }
+        updateWorkspace();
+    };
+    function restoreSettings(settings) {
+        PSP.speedS.value = settings.speed;
+        PSP.mixS.value = settings.mix;
+        PSP.decayS.value = settings.decay;
+        PSP.currentPresetName = settings.preset;
+        selectedPreset = settings.presetId;
+        PSP.eq.restore(settings.eq);
+        updateSettings();
+    }
+    function updateWorkspace() {
+        $('workspace-track').value = PSP.currentIndex < 0 ? '' : String(PSP.currentIndex);
+        $('workspace-play').disabled = !PSP.isLoaded;
+        $('workspace-play').textContent = PSP.isPlaying ? 'Pause' : 'Play';
+        $('workspace-play').setAttribute('aria-label', PSP.isPlaying ? 'Pause selected track' : 'Play selected track');
+        $('workspace-export').disabled = PSP.isExporting || PSP.isLoading || PSP.currentIndex < 0;
+        const fragment = document.createDocumentFragment();
+        const descriptions = PSP.describeEffects(PSP.captureSettings());
+        if (!descriptions.length) {
+            const original = document.createElement('span');
+            original.textContent = 'Original sound';
+            fragment.append(original);
+        }
+        descriptions.forEach(effect => {
+            const link = document.createElement('a');
+            link.href = `#${effect.page}`;
+            link.textContent = effect.label;
+            link.className = effect.active ? 'active-effect' : 'bypassed-effect';
+            fragment.append(link);
+        });
+        $('workspace-chain').replaceChildren(fragment);
+    }
+    PSP.updateWorkspace = updateWorkspace;
+    $('workspace-track').addEventListener('change', event => {
+        if (event.target.value !== '') loadTrack(Number(event.target.value));
+    });
+    $('workspace-play').addEventListener('click', () => mediaToggle());
+    $('workspace-add').addEventListener('click', () => $('audio-upload').click());
+    $('workspace-export').addEventListener('click', () => window.downloadOne(PSP.currentIndex));
 
     PSP.ensureAudio = async () => {
         if (!window.Tone) throw new Error('The audio engine could not load. Check your connection and reload.');
@@ -55,13 +108,12 @@
             PSP.context = Tone.getContext();
             audioReady = (async () => {
                 PSP.output = new Tone.Gain({ context: PSP.context, gain: Number($('volume-slider').value) / 100 }).toDestination();
-                PSP.reverb = new Tone.Reverb({ context: PSP.context, decay: Number(PSP.decayS.value), wet: Number(PSP.mixS.value) }).connect(PSP.output);
-                PSP.equalizer = PSP.eq.createChain(PSP.context, PSP.eq.snapshot());
-                PSP.equalizer.output.connect(PSP.reverb);
-                PSP.player = new Tone.Player({ context: PSP.context }).connect(PSP.equalizer.input);
+                PSP.processing = PSP.createProcessingChain(PSP.context, PSP.captureSettings());
+                PSP.processing.output.connect(PSP.output);
+                PSP.player = new Tone.Player({ context: PSP.context }).connect(PSP.processing.input);
                 PSP.analyzer = new Tone.Waveform({ context: PSP.context, size: 256 });
                 PSP.player.connect(PSP.analyzer);
-                await PSP.reverb.ready;
+                await PSP.processing.ready;
             })();
         }
         await PSP.context.resume();
@@ -102,6 +154,7 @@
         $('waveform-idle').hidden = PSP.isLoaded || PSP.isLoading;
         updateTime();
         drawWaveform();
+        updateWorkspace();
         document.dispatchEvent(new Event('playbackchange'));
     }
     function updateTime() {
@@ -152,6 +205,10 @@
             fragment.append(row);
         });
         $('file-rows').replaceChildren(fragment);
+        const placeholder = new Option('Select a track', '');
+        placeholder.disabled = true;
+        $('workspace-track').replaceChildren(placeholder, ...PSP.playlist.map((track, index) => new Option(track.name, String(index))));
+        $('workspace-track').disabled = !PSP.playlist.length;
         $('track-count').textContent = `${PSP.playlist.length} ${PSP.playlist.length === 1 ? 'track' : 'tracks'}`;
         $('empty-library').hidden = PSP.playlist.length > 0;
         PSP.batchBtn.disabled = PSP.isExporting || !PSP.playlist.length;
@@ -163,10 +220,11 @@
     function handleFiles(files) {
         if (PSP.isExporting) { PSP.notify('Wait for the export to finish before adding tracks.'); return; }
         let added = 0, skipped = 0;
+        const initialSettings = PSP.currentIndex < 0 ? PSP.captureSettings() : PSP.defaultSettings();
         for (const file of files) {
             if (!file.size || !(file.type.startsWith('audio/') || /\.(mp3|wav|flac|m4a|aac|ogg|opus|aiff?|webm)$/i.test(file.name))) { skipped++; continue; }
             if (PSP.playlist.some(track => track.name === file.name && track.size === file.size && track.modified === file.lastModified)) { skipped++; continue; }
-            PSP.playlist.push({ name: file.name, size: file.size, modified: file.lastModified, url: URL.createObjectURL(file) });
+            PSP.playlist.push({ name: file.name, size: file.size, modified: file.lastModified, url: URL.createObjectURL(file), settings: structuredClone(initialSettings) });
             added++;
         }
         renderList();
@@ -201,6 +259,7 @@
     async function loadTrack(index) {
         const track = PSP.playlist[index];
         if (!track) return;
+        PSP.saveCurrentSettings();
         const version = ++loadVersion;
         loadController?.abort();
         loadController = new AbortController();
@@ -209,6 +268,7 @@
         PSP.isLoaded = false;
         PSP.isLoading = true;
         PSP.currentIndex = index;
+        restoreSettings(track.settings);
         setTitle(track.name.replace(/\.[^/.]+$/, ''));
         $('track-detail').textContent = trackMeta(track);
         renderList();
@@ -225,8 +285,8 @@
             PSP.isLoading = false;
             track.duration = buffer.duration;
             track.error = false;
-            apply();
-            await PSP.reverb.ready;
+            apply(true);
+            await PSP.processing.ready;
             if (version !== loadVersion) return;
             $('track-detail').textContent = trackMeta(track);
             renderList();
@@ -252,6 +312,7 @@
             PSP.isLoaded = false;
             PSP.isLoading = false;
             PSP.currentIndex = -1;
+            restoreSettings(PSP.defaultSettings());
             if (PSP.player) PSP.player.buffer.dispose();
             setTitle('Add a track');
             $('track-detail').textContent = 'Adjust speed and reverb, then export.';
@@ -355,6 +416,7 @@
         PSP.decayS.value = preset.values.decay;
         updateSettings();
         apply();
+        PSP.saveCurrentSettings();
     }
     function updatePresetSelection() {
         $('preset-name').textContent = PSP.currentPresetName;
@@ -405,6 +467,7 @@
         if (!saveUserPresets([...userPresets, preset])) return;
         selectedPreset = preset.id;
         PSP.currentPresetName = name;
+        PSP.saveCurrentSettings();
         $('preset-dialog').close();
         renderPresets();
         PSP.notify(`Saved “${name}”.`);
@@ -418,7 +481,7 @@
         for (const slider of [PSP.speedS, PSP.mixS, PSP.decayS]) fillRange(slider);
         updatePresetSelection();
     }
-    function apply() {
+    function apply(immediate = false) {
         if (!PSP.player) return;
         if (PSP.isPlaying) {
             PSP.audioOffset = clamp(PSP.currentAudioPos(), 0, PSP.dur());
@@ -426,19 +489,14 @@
         }
         PSP.lastKnownRate = Number(PSP.speedS.value);
         PSP.player.playbackRate = PSP.lastKnownRate;
-        PSP.reverb.wet.value = Number(PSP.mixS.value);
-        clearTimeout(decayTimer);
-        // regenerating the impulse on every slider event creates unnecessary audio contexts
-        if (PSP.reverb.decay !== Number(PSP.decayS.value)) decayTimer = setTimeout(() => {
-            PSP.reverb.decay = Number(PSP.decayS.value);
-            PSP.reverb.ready.catch(() => PSP.notify('Could not update reverb. Try a shorter decay.'));
-        }, 180);
+        PSP.processing.update(PSP.captureSettings(), { immediate });
     }
     for (const slider of [PSP.speedS, PSP.mixS, PSP.decayS]) slider.addEventListener('input', () => {
         selectedPreset = null;
         PSP.currentPresetName = 'Custom';
         updateSettings();
         apply();
+        PSP.saveCurrentSettings();
     });
 
     function drawWaveform() {
