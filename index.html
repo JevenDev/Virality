@@ -13,11 +13,11 @@
     <script defer src="./js/equalizer.js?v=1.3"></script>
     <script defer src="./js/distortion.js?v=1.1"></script>
     <script defer src="./js/delay.js?v=1.1"></script>
-    <script defer src="./js/audio-chain.js?v=1.2"></script>
-    <script defer src="./js/app.js?v=2.9"></script>
-    <script defer src="./js/preset-data.js?v=1.0"></script>
+    <script defer src="./js/audio-chain.js?v=1.4"></script>
+    <script defer src="./js/app.js?v=3.0"></script>
+    <script defer src="./js/preset-data.js?v=1.1"></script>
     <script defer src="./js/history.js?v=1.1"></script>
-    <script defer src="./js/presets.js?v=1.2"></script>
+    <script defer src="./js/presets.js?v=1.3"></script>
     <script defer src="./js/session-data.js?v=1.1"></script>
     <script defer src="./js/sessions.js?v=1.0"></script>
     <script defer src="./js/loudness-worker.js?v=1.1"></script>
@@ -75,7 +75,7 @@
                     <section class="player" id="player" aria-labelledby="title-text" tabindex="-1">
                         <div class="section-heading"><span id="playback-state">Audio player</span><span id="track-position">No track selected</span></div>
                         <div class="now-playing-row"><div class="title-clip" id="title-clip"><div class="title-track" id="title-track"><h1 id="title-text">Add a track</h1></div></div></div>
-                        <p class="track-detail" id="track-detail">Adjust speed and reverb, then export.</p>
+                        <p class="track-detail" id="track-detail">Adjust speed, pitch, and reverb, then export.</p>
                         <div class="waveform-area"><canvas id="visualizer" aria-hidden="true"></canvas><div class="waveform-idle" id="waveform-idle"><svg class="icon"><use href="#i-music"/></svg></div></div>
                         <input id="seek-slider" class="seek-slider" type="range" min="0" max="1000" step="1" value="0" aria-label="Playback position" disabled>
                         <div class="time-row"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
@@ -90,6 +90,7 @@
                         <div class="section-heading"><h2 id="effects-title">Sound settings</h2><button class="text-button" id="reset-effects">Reset sound</button></div>
                         <div class="sliders-group">
                             <div class="control-row"><div class="label-row"><label for="speed-slider">Playback speed</label><output for="speed-slider" id="speed-val">1.00×</output></div><input type="range" min="0.5" max="1.5" step="0.01" value="1" id="speed-slider"><div class="range-labels"><span>0.5×</span><span>1.5×</span></div></div>
+                            <div class="control-row"><div class="label-row"><label for="pitch-slider">Pitch shift</label><output for="pitch-slider" id="pitch-val">0.0 st</output></div><input type="range" min="-12" max="12" step="0.1" value="0" id="pitch-slider" aria-describedby="pitch-help"><div class="range-labels"><span>−12 st</span><span id="pitch-help">Speed unchanged</span><span>+12 st</span></div></div>
                             <div class="control-row"><div class="label-row"><label for="mix-slider">Reverb mix</label><output for="mix-slider" id="mix-val">0%</output></div><input type="range" min="0" max="1" step="0.01" value="0" id="mix-slider"></div>
                             <div class="control-row"><div class="label-row"><label for="decay-slider">Reverb decay</label><output for="decay-slider" id="decay-val">2.0s</output></div><input type="range" min="0.5" max="10" step="0.1" value="2" id="decay-slider"></div>
                         </div>
@@ -254,7 +255,7 @@
     </section>
     <div id="notice" class="notice" role="status" hidden></div>
     <div class="export-bar" id="export-bar" hidden><div class="export-top"><span id="export-title" role="status">Exporting…</span><span id="export-pct">0%</span><button id="export-cancel" class="btn" disabled>Cancel</button></div><div class="export-track" id="export-progress" role="progressbar" aria-label="Export progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="export-fill"></div></div></div>
-    <dialog id="preset-dialog" aria-labelledby="preset-dialog-title"><form id="preset-form"><h2 id="preset-dialog-title">Save current sound</h2><p>Includes speed, reverb, EQ, delay, and distortion settings.</p><label for="preset-input">Preset name</label><input id="preset-input" maxlength="80" required autocomplete="off" placeholder="Late night"><label for="preset-description-input">Description (optional)</label><textarea id="preset-description-input" maxlength="240" rows="3" placeholder="What does this sound work well for?"></textarea><p id="preset-dialog-error" role="alert"></p><div class="dialog-actions"><button type="button" class="btn" id="preset-cancel">Cancel</button><button type="submit" class="btn primary">Save preset</button></div></form></dialog>
+    <dialog id="preset-dialog" aria-labelledby="preset-dialog-title"><form id="preset-form"><h2 id="preset-dialog-title">Save current sound</h2><p>Includes speed, pitch, reverb, EQ, delay, and distortion settings.</p><label for="preset-input">Preset name</label><input id="preset-input" maxlength="80" required autocomplete="off" placeholder="Late night"><label for="preset-description-input">Description (optional)</label><textarea id="preset-description-input" maxlength="240" rows="3" placeholder="What does this sound work well for?"></textarea><p id="preset-dialog-error" role="alert"></p><div class="dialog-actions"><button type="button" class="btn" id="preset-cancel">Cancel</button><button type="submit" class="btn primary">Save preset</button></div></form></dialog>
     <dialog id="preset-delete-dialog" aria-labelledby="preset-delete-title"><h2 id="preset-delete-title">Delete preset</h2><p id="preset-delete-name"></p><div class="dialog-actions"><button type="button" class="btn" id="preset-delete-cancel" autofocus>Cancel</button><button type="button" class="btn" id="preset-delete-confirm">Delete preset</button></div></dialog>
     <input type="file" id="session-upload" accept=".virality" hidden>
     <dialog id="session-dialog" aria-labelledby="session-dialog-title"><h2 id="session-dialog-title">Open session</h2><p id="session-summary"></p><p>This replaces your current tracks and sound settings. Your saved presets stay in this browser.</p><p id="session-error" role="alert"></p><button type="button" class="text-button" id="session-backup">Save current session first</button><div class="dialog-actions"><button type="button" class="btn" id="session-cancel">Cancel</button><button type="button" class="btn primary" id="session-confirm">Open session</button></div></dialog>

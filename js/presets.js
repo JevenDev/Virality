@@ -117,6 +117,7 @@
     }
     function summary(settings) {
         const effects = [];
+        if (settings.pitch) effects.push(`Pitch ${settings.pitch > 0 ? '+' : ''}${settings.pitch.toFixed(1)} st`);
         if (settings.mix > 0) effects.push('Reverb');
         if (settings.eq.enabled && (settings.eq.preamp || settings.eq.gains.some(gain => gain !== 0))) effects.push('EQ');
         if (settings.delay.enabled && settings.delay.mix > 0) effects.push('Delay');
@@ -174,6 +175,7 @@
         const state = value => value ? 'On' : 'Bypassed';
         const rows = [
             ['Speed', `${s.speed.toFixed(2)}× (also changes pitch)`],
+            ['Pitch shift', `${s.pitch > 0 ? '+' : ''}${s.pitch.toFixed(1)} semitones (speed unchanged)`],
             ['Reverb', `${s.mix ? 'On' : 'Off'} · ${percent(s.mix)} mix · ${s.decay.toFixed(1)} s decay`],
             ['Equalizer', `${state(s.eq.enabled)} · ${db(s.eq.preamp)} preamp`],
             ['Delay', `${state(s.delay.enabled)} · ${Math.round(s.delay.time * 1000)} ms · ${percent(s.delay.feedback)} feedback · ${percent(s.delay.mix)} mix`],

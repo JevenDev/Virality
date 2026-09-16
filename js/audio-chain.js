@@ -1,5 +1,75 @@
 (() => {
     const PSP = window.PSP;
+    const pitchModules = new WeakMap();
+    const pitchProcessorURL = new URL('./vendor/soundtouch-processor.js', document.currentScript.src).href;
+    function createPitch(context, settings) {
+        const input = new Tone.Gain({ context });
+        const output = new Tone.Gain({ context });
+        const dry = new Tone.Gain({ context });
+        const wet = new Tone.Gain({ context, gain: 0 });
+        input.connect(dry);
+        dry.connect(output);
+        wet.connect(output);
+        let node, silence, ready, disposed = false, pitch = settings.pitch ?? 0;
+        function route(immediate) {
+            const shifted = node && pitch !== 0 ? 1 : 0;
+            if (node) node.parameters.get('pitchSemitones').value = pitch;
+            if (immediate) {
+                dry.gain.value = 1 - shifted;
+                wet.gain.value = shifted;
+            } else {
+                dry.gain.rampTo(1 - shifted, .015);
+                wet.gain.rampTo(shifted, .015);
+            }
+        }
+        function prepare() {
+            if (ready || pitch === 0) return;
+            if (!pitchModules.has(context)) {
+                const loading = context.addAudioWorkletModule(pitchProcessorURL);
+                pitchModules.set(context, loading);
+                loading.catch(() => pitchModules.delete(context));
+            }
+            ready = pitchModules.get(context).then(() => {
+                if (disposed) return;
+                node = context.createAudioWorkletNode('soundtouch-processor', {
+                    numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2]
+                });
+                node.port.postMessage({ type: 'set-stretch-parameters', params: { quickSeek: false } });
+                node.onprocessorerror = () => PSP.notify('Pitch processing stopped. Reload the page to try again.');
+                // keep feeding silence so buffered audio drains after the source stops
+                silence = context.createConstantSource();
+                silence.offset.value = 0;
+                silence.connect(node);
+                silence.start(0);
+                input.connect(node);
+                Tone.connect(node, wet);
+                route(true);
+            });
+            ready.catch(error => {
+                ready = null;
+                console.error('Pitch processing initialization failed:', error);
+                if (!disposed) PSP.notify(window.isSecureContext
+                    ? `Could not start pitch processing: ${error.message}`
+                    : 'Pitch processing requires HTTPS or localhost. Open Virality using a secure address.');
+            });
+        }
+        prepare();
+        return {
+            input, output,
+            get ready() { return ready; },
+            update(next, immediate = false) {
+                pitch = next.pitch ?? 0;
+                prepare();
+                route(immediate);
+            },
+            dispose() {
+                disposed = true;
+                if (silence) { silence.stop(); silence.disconnect(); }
+                if (node) { node.disconnect(); node.port.close(); }
+                input.dispose(); output.dispose(); dry.dispose(); wet.dispose();
+            }
+        };
+    }
     function createReverb(context, settings) {
         const node = new Tone.Reverb({ context, decay: settings.decay, wet: settings.mix });
         let decayTimer;
@@ -22,6 +92,13 @@
         };
     }
     PSP.audioEffects = [
+        {
+            id: 'pitch', page: 'effects', create: createPitch,
+            update: (stage, settings, immediate) => stage.update(settings, immediate),
+            tail: settings => settings.pitch ? .25 : 0,
+            describe: settings => settings.pitch
+                ? { label: `Pitch ${settings.pitch > 0 ? '+' : ''}${settings.pitch.toFixed(1)} st`, active: true } : null
+        },
         {
             id: 'eq', page: 'equalizer',
             create: (context, settings) => PSP.eq.createChain(context, settings.eq),

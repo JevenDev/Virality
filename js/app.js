@@ -6,7 +6,7 @@
         playlist: [], currentIndex: -1, isLoaded: false, isPlaying: false,
         isLoading: false, isExporting: false, audioOffset: 0, startedAt: 0,
         lastKnownRate: 1, currentPresetName: 'Default', repeat: false,
-        speedS: $('speed-slider'), mixS: $('mix-slider'), decayS: $('decay-slider'),
+        speedS: $('speed-slider'), pitchS: $('pitch-slider'), mixS: $('mix-slider'), decayS: $('decay-slider'),
         exportFormatEl: $('export-format'), exportBitrateEl: $('export-bitrate'),
         batchBtn: $('batch-btn'), exportBar: $('export-bar'),
         exportTitleEl: $('export-title'), exportPctEl: $('export-pct'),
@@ -48,8 +48,8 @@
     }
     PSP.dur = () => PSP.isLoaded ? PSP.player.buffer.duration : 0;
     PSP.currentAudioPos = () => PSP.audioOffset + (PSP.isPlaying ? (PSP.context.now() - PSP.startedAt) * PSP.lastKnownRate : 0);
-    PSP.currentSettings = () => ({ speed: Number(PSP.speedS.value), mix: Number(PSP.mixS.value), decay: Number(PSP.decayS.value) });
-    PSP.defaultSettings = () => ({ speed: 1, mix: 0, decay: 2, eq: PSP.eq.defaults(), distortion: PSP.distortion.defaults(), delay: PSP.delay.defaults(), preset: 'Default', presetId: 'default' });
+    PSP.currentSettings = () => ({ speed: Number(PSP.speedS.value), pitch: Number(PSP.pitchS.value), mix: Number(PSP.mixS.value), decay: Number(PSP.decayS.value) });
+    PSP.defaultSettings = () => ({ speed: 1, pitch: 0, mix: 0, decay: 2, eq: PSP.eq.defaults(), distortion: PSP.distortion.defaults(), delay: PSP.delay.defaults(), preset: 'Default', presetId: 'default' });
     PSP.captureSettings = () => ({ ...PSP.currentSettings(), eq: PSP.eq.snapshot(), distortion: PSP.distortion.snapshot(), delay: PSP.delay.snapshot(), preset: PSP.currentPresetName, presetId: selectedPreset });
     PSP.committedSettings = () => PSP.presets?.committedSettings() ?? PSP.captureSettings();
     PSP.saveCurrentSettings = () => {
@@ -68,6 +68,7 @@
     };
     function restoreSettings(settings) {
         PSP.speedS.value = settings.speed;
+        PSP.pitchS.value = settings.pitch ?? 0;
         PSP.mixS.value = settings.mix;
         PSP.decayS.value = settings.decay;
         PSP.currentPresetName = settings.preset;
@@ -342,7 +343,7 @@
             PSP.history?.remember(null, PSP.captureSettings());
             if (PSP.player) PSP.player.buffer.dispose();
             setTitle('Add a track');
-            $('track-detail').textContent = 'Adjust speed and reverb, then export.';
+            $('track-detail').textContent = 'Adjust speed, pitch, and reverb, then export.';
         } else if (index < PSP.currentIndex) PSP.currentIndex--;
         PSP.playlist.splice(index, 1);
         URL.revokeObjectURL(track.url);
@@ -379,7 +380,7 @@
         PSP.exportBitrateEl.value = session.export.bitrate;
         PSP.exportBitrateEl.hidden = session.export.format !== 'mp3';
         setTitle('Add a track');
-        $('track-detail').textContent = 'Adjust speed and reverb, then export.';
+        $('track-detail').textContent = 'Adjust speed, pitch, and reverb, then export.';
         PSP.history.reset();
         previous.forEach(track => URL.revokeObjectURL(track.url));
         renderList();
@@ -454,9 +455,12 @@
 
     function updateSettings() {
         $('speed-val').textContent = `${Number(PSP.speedS.value).toFixed(2)}×`;
+        const pitch = Number(PSP.pitchS.value);
+        $('pitch-val').textContent = `${pitch > 0 ? '+' : ''}${pitch.toFixed(1)} st`;
+        PSP.pitchS.setAttribute('aria-valuetext', `${pitch} semitones`);
         $('mix-val').textContent = `${Math.round(PSP.mixS.value * 100)}%`;
         $('decay-val').textContent = `${Number(PSP.decayS.value).toFixed(1)}s`;
-        for (const slider of [PSP.speedS, PSP.mixS, PSP.decayS]) fillRange(slider);
+        for (const slider of [PSP.speedS, PSP.pitchS, PSP.mixS, PSP.decayS]) fillRange(slider);
         $('preset-name').textContent = PSP.currentPresetName;
     }
     function apply(immediate = false) {
@@ -469,7 +473,7 @@
         PSP.player.playbackRate = PSP.lastKnownRate;
         PSP.processing.update(PSP.captureSettings(), { immediate });
     }
-    for (const slider of [PSP.speedS, PSP.mixS, PSP.decayS]) slider.addEventListener('input', () => {
+    for (const slider of [PSP.speedS, PSP.pitchS, PSP.mixS, PSP.decayS]) slider.addEventListener('input', () => {
         updateSettings();
         apply();
         PSP.saveCurrentSettings();

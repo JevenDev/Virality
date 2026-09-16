@@ -30,13 +30,14 @@
         return value;
     }
     function settings(value) {
-        object(value, ['speed', 'mix', 'decay', 'eq', 'distortion', 'delay', 'preset', 'presetId'], 'Sound settings');
+        object(value, ['speed', 'pitch', 'mix', 'decay', 'eq', 'distortion', 'delay', 'preset', 'presetId'], 'Sound settings');
         const eq = object(value.eq, ['enabled', 'gains', 'preamp', 'preset'], 'Equalizer');
         const distortion = object(value.distortion, ['enabled', 'drive', 'tone', 'output', 'mix', 'preset'], 'Distortion');
         const delay = object(value.delay, ['enabled', 'time', 'feedback', 'mix', 'preset'], 'Delay');
         if (!Array.isArray(eq.gains) || eq.gains.length !== 10) throw new Error('Equalizer must contain 10 bands.');
         return {
             speed: number(value.speed, .5, 1.5, 'Speed', .01),
+            pitch: own(value, 'pitch') ? number(value.pitch, -12, 12, 'Pitch', .1) : 0,
             mix: number(value.mix, 0, 1, 'Reverb mix', .01),
             decay: number(value.decay, .5, 10, 'Reverb decay', .1),
             eq: {
