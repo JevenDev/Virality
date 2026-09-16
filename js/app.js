@@ -49,8 +49,8 @@
     PSP.dur = () => PSP.isLoaded ? PSP.player.buffer.duration : 0;
     PSP.currentAudioPos = () => PSP.audioOffset + (PSP.isPlaying ? (PSP.context.now() - PSP.startedAt) * PSP.lastKnownRate : 0);
     PSP.currentSettings = () => ({ speed: Number(PSP.speedS.value), mix: Number(PSP.mixS.value), decay: Number(PSP.decayS.value) });
-    PSP.defaultSettings = () => ({ speed: 1, mix: 0, decay: 2, eq: PSP.eq.defaults(), distortion: PSP.distortion.defaults(), preset: 'Default', presetId: 'default' });
-    PSP.captureSettings = () => ({ ...PSP.currentSettings(), eq: PSP.eq.snapshot(), distortion: PSP.distortion.snapshot(), preset: PSP.currentPresetName, presetId: selectedPreset });
+    PSP.defaultSettings = () => ({ speed: 1, mix: 0, decay: 2, eq: PSP.eq.defaults(), distortion: PSP.distortion.defaults(), delay: PSP.delay.defaults(), preset: 'Default', presetId: 'default' });
+    PSP.captureSettings = () => ({ ...PSP.currentSettings(), eq: PSP.eq.snapshot(), distortion: PSP.distortion.snapshot(), delay: PSP.delay.snapshot(), preset: PSP.currentPresetName, presetId: selectedPreset });
     PSP.saveCurrentSettings = () => {
         const track = PSP.playlist[PSP.currentIndex];
         if (track) {
@@ -71,6 +71,7 @@
         selectedPreset = settings.presetId;
         PSP.eq.restore(settings.eq);
         PSP.distortion.restore(settings.distortion);
+        PSP.delay.restore(settings.delay);
         updateSettings();
     }
     function updateWorkspace() {

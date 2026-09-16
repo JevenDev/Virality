@@ -6,13 +6,14 @@
     <meta name="theme-color" content="#07358d">
     <meta name="description" content="A PSP-inspired audio editor for slowed + reverb, nightcore, and local WAV and MP3 exports.">
     <title>Virality · Audio editor</title>
-    <link rel="stylesheet" href="./style.css?v=2.11">
+    <link rel="stylesheet" href="./style.css?v=2.12">
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script defer src="./js/bg-waves.js?v=2.0"></script>
     <script defer src="./js/equalizer.js?v=1.1"></script>
     <script defer src="./js/distortion.js?v=1.0"></script>
-    <script defer src="./js/audio-chain.js?v=1.1"></script>
-    <script defer src="./js/app.js?v=2.5"></script>
+    <script defer src="./js/delay.js?v=1.0"></script>
+    <script defer src="./js/audio-chain.js?v=1.2"></script>
+    <script defer src="./js/app.js?v=2.6"></script>
     <script defer src="./js/loudness-worker.js?v=1.1"></script>
     <script defer src="./js/loudness.js?v=1.1"></script>
     <script defer src="./js/export.js?v=2.2"></script>
@@ -33,7 +34,7 @@
         <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4zM17 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></symbol>
         <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 10V7h15l-3-3m4 10v3H5l3 3M16 10l3-3M8 14l-3 3"/></symbol>
         <symbol id="i-equalizer" viewBox="0 0 32 32"><path d="M4 8v16M10 4v24M16 10v12M22 6v20M28 12v8"/></symbol>
-        <symbol id="i-echo" viewBox="0 0 32 32"><path d="M4 13v6M10 10a9 9 0 0 1 0 12M17 6a15 15 0 0 1 0 20M24 2a21 21 0 0 1 0 28"/></symbol>
+        <symbol id="i-delay" viewBox="0 0 32 32"><path d="M4 13v6M10 10a9 9 0 0 1 0 12M17 6a15 15 0 0 1 0 20M24 2a21 21 0 0 1 0 28"/></symbol>
         <symbol id="i-distortion" viewBox="0 0 32 32"><path d="M2 16h5l4-11 7 22 4-11h8"/></symbol>
         <symbol id="i-compressor" viewBox="0 0 32 32"><path d="M3 8h26M3 24h26M16 2v12m-4-4 4 4 4-4M16 30V18m-4 4 4-4 4 4"/></symbol>
         <symbol id="i-loudness" viewBox="0 0 32 32"><path d="M5 25V15M12 25V7M19 25V11M26 25V3M3 29h26"/></symbol>
@@ -44,7 +45,7 @@
         <div class="dock-items" role="tablist" aria-label="Audio tools" aria-orientation="vertical">
             <button class="dock-item" id="dock-music" role="tab" aria-controls="music-page" aria-selected="true" data-tool="music"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Music</span></button>
             <button class="dock-item" id="dock-equalizer" role="tab" aria-controls="equalizer" aria-selected="false" tabindex="-1" data-tool="equalizer"><svg class="icon" aria-hidden="true"><use href="#i-equalizer"/></svg><span>Equalizer</span></button>
-            <button class="dock-item" id="dock-echo" role="tab" aria-controls="echo" aria-selected="false" tabindex="-1" data-tool="echo"><svg class="icon" aria-hidden="true"><use href="#i-echo"/></svg><span>Echo</span></button>
+            <button class="dock-item" id="dock-delay" role="tab" aria-controls="delay" aria-selected="false" tabindex="-1" data-tool="delay"><svg class="icon" aria-hidden="true"><use href="#i-delay"/></svg><span>Delay</span></button>
             <button class="dock-item" id="dock-distortion" role="tab" aria-controls="distortion" aria-selected="false" tabindex="-1" data-tool="distortion"><svg class="icon" aria-hidden="true"><use href="#i-distortion"/></svg><span>Distortion</span></button>
             <button class="dock-item" id="dock-compressor" role="tab" aria-controls="compressor" aria-selected="false" tabindex="-1" data-tool="compressor"><svg class="icon" aria-hidden="true"><use href="#i-compressor"/></svg><span>Compressor</span></button>
             <button class="dock-item" id="dock-loudness" role="tab" aria-controls="loudness" aria-selected="false" tabindex="-1" data-tool="loudness"><svg class="icon" aria-hidden="true"><use href="#i-loudness"/></svg><span>LUFS</span></button>
@@ -100,13 +101,18 @@
                 <div class="eq-bottom"><div class="eq-preset-section"><div class="preset-heading"><h2>Presets</h2><span id="eq-preset-name">Flat</span></div><div class="eq-presets" id="eq-presets"></div></div><div class="eq-preamp-section"><div class="label-row"><label for="eq-preamp">Preamp</label><output id="eq-preamp-value" for="eq-preamp">0.0 dB</output></div><input id="eq-preamp" type="range" min="-24" max="6" step="0.5" value="0"><div class="eq-preamp-footer"><span>−24 to +6 dB</span><button class="text-button" id="eq-auto-gain">Auto gain</button></div></div></div>
                 <div class="eq-footnote"><p id="eq-headroom">Applied to playback and exports.</p><span>Double-click a band to reset it.</span></div>
             </section>
-            <section class="tool-page coming-soon-page" id="echo" role="tabpanel" aria-labelledby="dock-echo" hidden inert>
-                <div class="coming-soon-content">
-                    <svg class="soon-icon icon" aria-hidden="true"><use href="#i-echo"/></svg>
-                    <h1 class="soon-heading">Echo</h1>
-                    <p class="soon-message">Coming soon</p>
-                    <button class="text-button return-to-music">Back to music</button>
+            <section class="tool-page delay-page" id="delay" role="tabpanel" aria-labelledby="dock-delay" hidden inert>
+                <div class="delay-heading"><div class="delay-title"><svg class="icon" aria-hidden="true"><use href="#i-delay"/></svg><h1>Delay</h1></div><div class="delay-actions"><button class="btn" id="delay-enabled" aria-pressed="false">Bypassed</button><button class="text-button" id="delay-reset">Reset delay</button></div></div>
+                <div class="delay-layout">
+                    <figure class="delay-response"><figcaption><h2>Repeat pattern</h2><span>Level over time</span></figcaption><svg id="delay-graph" viewBox="0 0 480 260" preserveAspectRatio="none" role="img" aria-label="Delay repeat pattern"><path class="delay-grid" d="M8 20H472 M8 130H472 M124 20V240 M240 20V240 M356 20V240 M472 20V240"/><path class="delay-zero" d="M8 240H472"/><path id="delay-dry" d="M8 240V20"/><path id="delay-repeats" d=""/></svg><div class="delay-time-axis" aria-hidden="true"><span>0 s</span><span>1</span><span>2</span><span>3</span><span>4 s</span></div></figure>
+                    <div class="delay-controls">
+                        <div><div class="label-row"><label for="delay-time">Delay time</label><output id="delay-time-value" for="delay-time">300 ms</output></div><input id="delay-time" type="range" min="20" max="1000" step="1" value="300"><div class="range-labels"><span>20 ms</span><span>1,000 ms</span></div></div>
+                        <div><div class="label-row"><label for="delay-feedback">Feedback</label><output id="delay-feedback-value" for="delay-feedback">35%</output></div><input id="delay-feedback" type="range" min="0" max="80" step="1" value="35"><div class="range-labels"><span>One repeat</span><span>80%</span></div></div>
+                        <div><div class="label-row"><label for="delay-mix">Mix</label><output id="delay-mix-value" for="delay-mix">30%</output></div><input id="delay-mix" type="range" min="0" max="100" step="1" value="30"><div class="range-labels"><span>Dry</span><span>Wet</span></div></div>
+                    </div>
                 </div>
+                <div class="delay-presets-section"><div class="preset-heading"><h2>Presets</h2><span id="delay-preset-name">Off</span></div><div class="delay-presets" id="delay-presets"></div></div>
+                <div class="delay-footnote"><p id="delay-status">Bypassed for playback and export.</p><span>Feedback controls how long repeats last.</span></div>
             </section>
             <section class="tool-page distortion-page" id="distortion" role="tabpanel" aria-labelledby="dock-distortion" hidden inert>
                 <div class="distortion-heading"><div class="distortion-title"><svg class="icon" aria-hidden="true"><use href="#i-distortion"/></svg><h1>Distortion</h1></div><div class="distortion-actions"><button class="btn" id="distortion-enabled" aria-pressed="false">Bypassed</button><button class="text-button" id="distortion-reset">Reset distortion</button></div></div>

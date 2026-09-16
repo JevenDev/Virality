@@ -37,6 +37,14 @@
                 ? { label: settings.distortion.enabled && settings.distortion.mix > 0 ? 'Distortion' : 'Distortion bypassed', active: settings.distortion.enabled && settings.distortion.mix > 0 } : null
         },
         {
+            id: 'delay', page: 'delay',
+            create: (context, settings) => PSP.delay.createChain(context, settings.delay),
+            update: (stage, settings, immediate) => stage.update(settings.delay, immediate),
+            tail: settings => PSP.delay.tail(settings.delay),
+            describe: settings => settings.delay && (settings.delay.enabled || settings.delay.preset !== 'Off')
+                ? { label: settings.delay.enabled && settings.delay.mix > 0 ? `Delay ${Math.round(settings.delay.time * 1000)} ms` : 'Delay bypassed', active: settings.delay.enabled && settings.delay.mix > 0 } : null
+        },
+        {
             id: 'reverb', page: 'effects', create: createReverb,
             update: (stage, settings, immediate) => stage.update(settings, immediate),
             tail: settings => settings.mix > 0 ? settings.decay + .01 : 0,
