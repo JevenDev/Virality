@@ -1,142 +1,266 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Virality</title>
-
-  <link rel="stylesheet" href="./style.css" />
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#07358d">
+    <meta name="description" content="A PSP-inspired audio editor for slowed + reverb, nightcore, and local WAV and MP3 exports.">
+    <title>Virality · Audio editor</title>
+    <link rel="stylesheet" href="./style.css?v=2.18">
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script defer src="./js/bg-waves.js?v=2.0"></script>
+    <script defer src="./js/backgrounds.js?v=1.1"></script>
+    <script defer src="./js/equalizer.js?v=1.3"></script>
+    <script defer src="./js/distortion.js?v=1.1"></script>
+    <script defer src="./js/delay.js?v=1.1"></script>
+    <script defer src="./js/vendor/SignalsmithStretch.js?v=1.3.2"></script>
+    <script defer src="./js/audio-chain.js?v=1.5"></script>
+    <script defer src="./js/app.js?v=3.2"></script>
+    <script defer src="./js/preset-data.js?v=1.1"></script>
+    <script defer src="./js/history.js?v=1.1"></script>
+    <script defer src="./js/presets.js?v=1.3"></script>
+    <script defer src="./js/session-data.js?v=1.1"></script>
+    <script defer src="./js/sessions.js?v=1.0"></script>
+    <script defer src="./js/loudness-worker.js?v=1.1"></script>
+    <script defer src="./js/loudness.js?v=1.1"></script>
+    <script defer src="./js/export.js?v=2.4"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script defer src="./js/dock.js?v=2.6"></script>
 </head>
-
 <body>
-    <!-- background effects -->
-    <canvas id="bg-waves"></canvas>
-    <div class="background-scanlines"></div>
-
+    <a class="skip-link" href="#player">Skip to player</a>
+    <canvas id="bg-waves" aria-hidden="true"></canvas>
+    <div class="background-scanlines" aria-hidden="true"></div>
+    <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13M9 8l12-2"/><ellipse cx="6" cy="18" rx="3" ry="2"/><ellipse cx="18" cy="16" rx="3" ry="2"/></symbol>
+        <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 3v7m0 4v7M12 3v3m0 4v11M19 3v11m0 4v3M2 10h6M9 6h6m1 8h6"/></symbol>
+        <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18h1.5a2.5 2.5 0 0 0 0-5H12a2 2 0 0 1 0-4h3a6 6 0 0 0 0-9z"/><circle cx="7.5" cy="9" r=".75"/><circle cx="10" cy="6.5" r=".75"/><circle cx="7.5" cy="14" r=".75"/></symbol>
+        <symbol id="i-library" viewBox="0 0 24 24"><path d="M3 5h4v16H3zM10 3h4v18h-4zM17 6l4-1 3 15-4 1z"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+        <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+        <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4zM17 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></symbol>
+        <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 10V7h15l-3-3m4 10v3H5l3 3M16 10l3-3M8 14l-3 3"/></symbol>
+        <symbol id="i-equalizer" viewBox="0 0 32 32"><path d="M4 8v16M10 4v24M16 10v12M22 6v20M28 12v8"/></symbol>
+        <symbol id="i-delay" viewBox="0 0 32 32"><path d="M4 13v6M10 10a9 9 0 0 1 0 12M17 6a15 15 0 0 1 0 20M24 2a21 21 0 0 1 0 28"/></symbol>
+        <symbol id="i-distortion" viewBox="0 0 32 32"><path d="M2 16h5l4-11 7 22 4-11h8"/></symbol>
+        <symbol id="i-compressor" viewBox="0 0 32 32"><path d="M3 8h26M3 24h26M16 2v12m-4-4 4 4 4-4M16 30V18m-4 4 4-4 4 4"/></symbol>
+        <symbol id="i-loudness" viewBox="0 0 32 32"><path d="M5 25V15M12 25V7M19 25V11M26 25V3M3 29h26"/></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></symbol>
+    </svg>
+    <nav class="tool-dock" aria-label="Audio tools">
+        <button class="dock-step dock-previous" id="dock-previous" aria-label="Previous tool"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+        <div class="dock-items" role="tablist" aria-label="Audio tools" aria-orientation="vertical">
+            <button class="dock-item" id="dock-music" role="tab" aria-controls="music-page" aria-selected="true" data-tool="music"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Music</span></button>
+            <button class="dock-item" id="dock-presets" role="tab" aria-controls="presets" aria-selected="false" tabindex="-1" data-tool="presets"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Presets</span></button>
+            <button class="dock-item" id="dock-backgrounds" role="tab" aria-controls="backgrounds" aria-selected="false" tabindex="-1" data-tool="backgrounds"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg><span>Background</span></button>
+            <button class="dock-item" id="dock-equalizer" role="tab" aria-controls="equalizer" aria-selected="false" tabindex="-1" data-tool="equalizer"><svg class="icon" aria-hidden="true"><use href="#i-equalizer"/></svg><span>Equalizer</span></button>
+            <button class="dock-item" id="dock-delay" role="tab" aria-controls="delay" aria-selected="false" tabindex="-1" data-tool="delay"><svg class="icon" aria-hidden="true"><use href="#i-delay"/></svg><span>Delay</span></button>
+            <button class="dock-item" id="dock-distortion" role="tab" aria-controls="distortion" aria-selected="false" tabindex="-1" data-tool="distortion"><svg class="icon" aria-hidden="true"><use href="#i-distortion"/></svg><span>Distortion</span></button>
+            <button class="dock-item" id="dock-compressor" role="tab" aria-controls="compressor" aria-selected="false" tabindex="-1" data-tool="compressor"><svg class="icon" aria-hidden="true"><use href="#i-compressor"/></svg><span>Compressor</span></button>
+            <button class="dock-item" id="dock-loudness" role="tab" aria-controls="loudness" aria-selected="false" tabindex="-1" data-tool="loudness"><svg class="icon" aria-hidden="true"><use href="#i-loudness"/></svg><span>LUFS</span></button>
+        </div>
+        <button class="dock-step dock-next" id="dock-next" aria-label="Next tool"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+    </nav>
     <div class="psp-container">
-        <div class="waveform-area">
-            <canvas id="visualizer"></canvas>
-        </div>
-
-        <div class="top-controls">
-        <div class="controls-left">
-            <button class="media-btn" title="Previous / Restart" onclick="mediaPrev()" aria-label="Previous">
-                <svg class="icon" viewBox="0 0 64 32" aria-hidden="true">
-                    <rect x="6" y="6" width="4" height="20" rx="1"></rect>
-                    <polygon points="28,6 12,16 28,26"></polygon>
-                    <polygon points="46,6 30,16 46,26"></polygon>
-                </svg>
-            </button>
-
-            <button class="media-btn" id="master-play" title="Play/Pause" onclick="mediaToggle()" aria-label="Play/Pause">
-                <svg class="icon icon-play" viewBox="0 0 64 32" aria-hidden="true">
-                    <polygon points="22,6 22,26 46,16"></polygon>
-                </svg>
-                <svg class="icon icon-pause" viewBox="0 0 64 32" aria-hidden="true">
-                    <rect x="22" y="6" width="6" height="20" rx="1"></rect>
-                    <rect x="36" y="6" width="6" height="20" rx="1"></rect>
-                </svg>
-            </button>
-
-            <button class="media-btn" title="Next" onclick="mediaNext()" aria-label="Next">
-                <svg class="icon" viewBox="0 0 64 32" aria-hidden="true">
-                    <polygon points="18,6 34,16 18,26"></polygon>
-                    <polygon points="36,6 52,16 36,26"></polygon>
-                    <rect x="54" y="6" width="4" height="20" rx="1"></rect>
-                </svg>
-            </button>
-        </div>
-
-        <div class="time-display" id="time-display">0:00 / 0:00</div>
-        </div>
-
-        <div class="seek-wrap" id="seek-wrap" title="Seek">
-        <div class="seek-track"></div>
-        <div class="seek-fill" id="seek-fill"></div>
-        <div class="seek-notch" id="seek-notch" style="left:0%"></div>
-        </div>
-
-        <div class="now-playing-row">
-        <div class="now-prefix">Now Playing:</div>
-        <div class="title-clip" id="title-clip" aria-label="Track title">
-            <div class="title-track" id="title-track">
-            <div class="title-text" id="title-text">Drop audio to start</div>
-            </div>
-        </div>
-        </div>
-
-        <div class="glass-panel">
-        <div class="sliders-group">
-            <div class="control-row">
-            <div class="label-row"><span>Speed</span><span id="speed-val">1.0x</span></div>
-            <input type="range" min="0.5" max="1.5" step="0.05" value="1" id="speed-slider">
-            </div>
-
-            <div class="control-row">
-            <div class="label-row"><span>Reverb Mix</span><span id="mix-val">0%</span></div>
-            <input type="range" min="0" max="1" step="0.05" value="0" id="mix-slider">
-            </div>
-
-            <div class="control-row">
-            <div class="label-row"><span>Reverb Decay</span><span id="decay-val">1.5s</span></div>
-            <input type="range" min="0.5" max="10" step="0.5" value="1.5" id="decay-slider">
-            </div>
-        </div>
-
-        <div class="presets-group" id="presets-group"></div>
-        </div>
-
-        <div class="file-list-panel">
-        <div class="export-controls">
-            <div class="upload-trigger" onclick="document.getElementById('audio-upload').click()">
-            + UPLOAD FILES
-            </div>
-
-            <div class="spacer"></div>
-
-            <select id="export-format" title="Export format">
-            <option value="wav">WAV</option>
-            <option value="mp3">MP3</option>
-            </select>
-
-            <select id="export-bitrate" title="MP3 bitrate">
-            <option value="128">128 kbps</option>
-            <option value="160">160 kbps</option>
-            <option value="192" selected>192 kbps</option>
-            <option value="256">256 kbps</option>
-            <option value="320">320 kbps</option>
-            </select>
-
-            <button class="btn" id="batch-btn" style="padding:10px 12px; font-size:16px;" onclick="batchDownload()">Batch Download</button>
-        </div>
-
-        <div id="file-rows"></div>
-        </div>
-
-        <input type="file" id="audio-upload" accept="audio/*" multiple>
+        <header class="site-header"><a class="wordmark" href="./" aria-label="Virality home">virality</a><div class="header-right"><time class="system-clock" id="system-clock" aria-label="Current date and time"></time><button id="help-button" class="text-button" aria-label="Keyboard shortcuts">?</button></div></header>
+        <section class="workspace" aria-label="Current track">
+            <div class="workspace-toolbar"><div class="workspace-track"><label for="workspace-track">Editing</label><select id="workspace-track" aria-label="Track to edit"><option value="">No track selected</option></select></div><button class="btn" id="workspace-play" aria-label="Play selected track" disabled>Play</button><button class="btn" id="workspace-add">Add audio</button><div class="workspace-export"><label for="export-format">Export as</label><select id="export-format"><option value="wav">WAV</option><option value="mp3">MP3</option></select><select id="export-bitrate" aria-label="MP3 bitrate" hidden><option value="128">128 kbps</option><option value="160">160 kbps</option><option value="192" selected>192 kbps</option><option value="256">256 kbps</option><option value="320">320 kbps</option></select><button class="btn" id="workspace-export" disabled>Export track</button></div></div>
+            <div class="workspace-effects"><span>Effects</span><div id="workspace-chain" aria-label="Processing order"><span>Original sound</span></div></div>
+            <div class="workspace-actions"><div class="history-actions" role="group" aria-label="Sound edit history"><button class="btn" id="history-undo" disabled>Undo</button><button class="btn" id="history-redo" disabled>Redo</button></div><div class="session-actions" role="group" aria-label="Session files"><button class="btn" id="session-save">Save session</button><button class="btn" id="session-open">Open session</button></div></div>
+            <p id="session-status" role="status"></p>
+        </section>
+        <main class="page-stack">
+            <section class="tool-page" id="music-page" role="tabpanel" aria-labelledby="dock-music">
+                <div class="editor-layout">
+                    <section class="player" id="player" aria-labelledby="title-text" tabindex="-1">
+                        <div class="section-heading"><span id="playback-state">Audio player</span><span id="track-position">No track selected</span></div>
+                        <div class="now-playing-row"><div class="title-clip" id="title-clip"><div class="title-track" id="title-track"><h1 id="title-text">Add a track</h1></div></div></div>
+                        <p class="track-detail" id="track-detail">Adjust speed, pitch, and reverb, then export.</p>
+                        <div class="waveform-area"><canvas id="visualizer" aria-hidden="true"></canvas><div class="waveform-idle" id="waveform-idle"><svg class="icon"><use href="#i-music"/></svg></div></div>
+                        <input id="seek-slider" class="seek-slider" type="range" min="0" max="1000" step="1" value="0" aria-label="Playback position" disabled>
+                        <div class="time-row"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
+                        <div class="transport-row"><div class="controls-left">
+                            <button class="media-btn" id="previous-button" title="Previous / restart" aria-label="Previous or restart" disabled><svg viewBox="0 0 24 24" class="icon filled"><path d="M5 5h2v14H5zm14 0v14L8 12z"/></svg></button>
+                            <button class="media-btn master-play" id="master-play" title="Play (Space)" aria-label="Play" disabled><svg class="icon filled icon-play" viewBox="0 0 24 24"><path d="m8 4 13 8-13 8z"/></svg><svg class="icon filled icon-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg></button>
+                            <button class="media-btn" id="next-button" title="Next track" aria-label="Next track" disabled><svg viewBox="0 0 24 24" class="icon filled"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z"/></svg></button>
+                            <button class="media-btn repeat-button" id="repeat-button" title="Repeat track" aria-label="Repeat track" aria-pressed="false"><svg class="icon"><use href="#i-repeat"/></svg></button>
+                        </div><div class="volume-control"><button class="media-btn" id="mute-button" aria-label="Mute" aria-pressed="false"><svg class="icon"><use href="#i-volume"/></svg></button><input type="range" id="volume-slider" min="0" max="100" value="80" aria-label="Preview volume"><output for="volume-slider" id="volume-val">80%</output></div></div>
+                    </section>
+                    <section class="effects" id="effects" aria-labelledby="effects-title">
+                        <div class="section-heading"><h2 id="effects-title">Sound settings</h2><button class="text-button" id="reset-effects">Reset sound</button></div>
+                        <div class="sliders-group">
+                            <div class="control-row"><div class="label-row"><label for="speed-slider">Playback speed</label><output for="speed-slider" id="speed-val">1.00×</output></div><input type="range" min="0.5" max="1.5" step="0.01" value="1" id="speed-slider"><div class="range-labels"><span>0.5×</span><span>1.5×</span></div></div>
+                            <div class="control-row"><div class="label-row"><label for="pitch-slider">Pitch shift</label><output for="pitch-slider" id="pitch-val">0.0 st</output></div><input type="range" min="-12" max="12" step="0.1" value="0" id="pitch-slider" aria-describedby="pitch-help"><div class="range-labels"><span>−12 st</span><span id="pitch-help">Speed unchanged</span><span>+12 st</span></div></div>
+                            <div class="control-row"><div class="label-row"><label for="mix-slider">Reverb mix</label><output for="mix-slider" id="mix-val">0%</output></div><input type="range" min="0" max="1" step="0.01" value="0" id="mix-slider"></div>
+                            <div class="control-row"><div class="label-row"><label for="decay-slider">Reverb decay</label><output for="decay-slider" id="decay-val">2.0s</output></div><input type="range" min="0.5" max="10" step="0.1" value="2" id="decay-slider"></div>
+                        </div>
+                        <div class="preset-heading"><h3>Current preset</h3><span id="preset-name">Default</span></div><a class="btn preset-library-link" href="#presets">Browse and save presets</a>
+                    </section>
+                </div>
+                <section class="library" id="library" aria-labelledby="library-title">
+                    <div class="library-toolbar"><div class="library-heading"><svg class="icon"><use href="#i-library"/></svg><h2 id="library-title">Your library</h2><span id="track-count">0 tracks</span></div><button class="btn" id="add-files"><svg class="icon"><use href="#i-plus"/></svg>Add audio</button></div>
+                    <div class="empty-library" id="empty-library"><svg class="icon"><use href="#i-music"/></svg><div><h3>Drop audio files here</h3><p>or <button class="inline-button" id="browse-files">browse files</button></p><span>MP3, WAV, FLAC, M4A, OGG &amp; more</span></div></div>
+                    <div id="file-rows" role="list" aria-label="Audio tracks"></div>
+                    <div class="export-controls"><p>© JVN 2026</p><div class="export-options"><button class="btn primary" id="batch-btn" disabled><svg class="icon"><use href="#i-download"/></svg>Export all</button></div></div>
+                </section>
+            </section>
+            <section class="tool-page presets-page" id="presets" role="tabpanel" aria-labelledby="dock-presets" hidden inert>
+                <div class="presets-heading"><h1>Presets</h1><div class="presets-toolbar"><button class="btn" id="presets-import">Import</button><button class="btn" id="presets-export-all">Export my presets</button><button class="btn primary" id="presets-save">Save current sound</button></div></div>
+                <div class="presets-current-row"><p id="presets-current">Current sound: Default</p></div>
+                <div class="presets-layout">
+                    <div class="presets-browser">
+                        <label for="presets-search">Search presets</label><input id="presets-search" type="search" placeholder="Name, description, or effect" autocomplete="off">
+                        <div class="presets-filter-row"><label for="presets-filter">Show</label><select id="presets-filter"><option value="all">All presets</option><option value="builtin">Built-in</option><option value="user">My presets</option></select><span id="presets-count"></span></div>
+                        <ul id="presets-list" aria-label="Preset library"></ul>
+                        <p id="presets-empty" hidden>No presets match your search.</p>
+                    </div>
+                    <section class="presets-detail" id="presets-detail" aria-labelledby="presets-detail-name">
+                        <div class="presets-detail-heading"><h2 id="presets-detail-name"></h2><span id="presets-origin"></span></div>
+                        <p id="presets-description"></p>
+                        <dl id="presets-values"></dl>
+                        <details class="presets-eq-details"><summary>EQ band values</summary><dl id="presets-bands"></dl></details>
+                        <p id="presets-target"></p>
+                        <div class="presets-apply-actions"><button class="btn primary" id="presets-apply">Apply preset</button><button class="btn" id="presets-apply-all">Apply to all tracks</button></div>
+                        <p class="presets-apply-note">Click a preset to preview its sound. Apply keeps the changes. Undo restores your previous settings.</p>
+                        <div class="presets-manage-actions"><button class="btn" id="presets-update">Update from current sound</button><button class="btn" id="presets-edit">Edit name / description</button><button class="btn" id="presets-duplicate">Duplicate</button><button class="btn" id="presets-export">Export preset</button><button class="text-button" id="presets-delete">Delete</button></div>
+                    </section>
+                </div>
+                <div class="presets-footer"><p>Saved in this browser. Export your presets to back them up or use them elsewhere.</p><p>Import skips identical presets and gives conflicting names a numbered suffix.</p><p id="presets-import-result" role="status"></p></div>
+                <input type="file" id="presets-upload" accept=".json,application/json" hidden>
+            </section>
+            <section class="tool-page backgrounds-page" id="backgrounds" role="tabpanel" aria-labelledby="dock-backgrounds" hidden inert>
+                <div class="backgrounds-heading"><h1>Background</h1><button class="text-button" id="background-reset">Reset colors</button></div>
+                <div class="backgrounds-layout">
+                    <div class="background-editor">
+                        <fieldset>
+                            <legend>Page background</legend>
+                            <div class="background-mode-row"><label for="background-mode">Style</label><select id="background-mode"><option value="gradient">Gradient</option><option value="single">Single color</option></select></div>
+                            <div class="background-color-grid">
+                                <label class="color-control"><span>First color</span><span><input type="color" id="background-start" data-background-color="start" value="#071f65"><output for="background-start">#071F65</output></span></label>
+                                <label class="color-control gradient-only"><span>Middle color</span><span><input type="color" id="background-middle" data-background-color="middle" value="#0c48a5"><output for="background-middle">#0C48A5</output></span></label>
+                                <label class="color-control gradient-only"><span>End color</span><span><input type="color" id="background-end" data-background-color="end" value="#168bcc"><output for="background-end">#168BCC</output></span></label>
+                            </div>
+                            <label class="background-angle gradient-only" for="background-angle"><span>Gradient angle</span><span><input type="range" id="background-angle" min="0" max="360" step="1" value="155"><output for="background-angle">155°</output></span></label>
+                        </fieldset>
+                        <fieldset>
+                            <legend>Interface surfaces</legend>
+                            <div class="background-color-grid">
+                                <label class="color-control"><span>Fields and scroll tracks</span><span><input type="color" id="background-field" data-background-color="field" value="#174e91"><output for="background-field">#174E91</output></span></label>
+                                <label class="color-control"><span>Notices and floating controls</span><span><input type="color" id="background-surface" data-background-color="surface" value="#092956"><output for="background-surface">#092956</output></span></label>
+                                <label class="color-control"><span>Dialogs</span><span><input type="color" id="background-popup" data-background-color="popup" value="#0b3777"><output for="background-popup">#0B3777</output></span></label>
+                                <label class="color-control"><span>Mobile dock</span><span><input type="color" id="background-dock" data-background-color="dock" value="#082b6a"><output for="background-dock">#082B6A</output></span></label>
+                                <label class="color-control"><span>Drop target</span><span><input type="color" id="background-drop" data-background-color="drop" value="#07358d"><output for="background-drop">#07358D</output></span></label>
+                                <label class="color-control"><span>Cursor and active controls</span><span><input type="color" id="background-cursor" data-background-color="cursor" value="#ffffff"><output for="background-cursor">#FFFFFF</output></span></label>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <section class="background-presets" aria-labelledby="background-presets-title">
+                        <h2 id="background-presets-title">Color presets</h2>
+                        <label for="background-preset-select">Choose preset</label>
+                        <select id="background-preset-select"></select>
+                        <label for="background-preset-name">Save current colors</label>
+                        <div class="background-save-row"><input id="background-preset-name" maxlength="80" autocomplete="off" placeholder="Preset name"><button class="btn primary" id="background-save">Save</button></div>
+                        <div class="background-preset-actions"><button class="btn" id="background-delete">Delete</button><button class="btn" id="background-import">Import</button><button class="btn" id="background-export">Export my presets</button></div>
+                        <p>Colors and custom presets stay in this browser.</p>
+                        <p id="background-status" role="status"></p>
+                    </section>
+                </div>
+                <input type="file" id="background-upload" accept=".json,application/json" hidden>
+            </section>
+            <section class="tool-page eq-page" id="equalizer" role="tabpanel" aria-labelledby="dock-equalizer" hidden inert>
+                <div class="eq-heading"><div class="eq-title"><svg class="icon" aria-hidden="true"><use href="#i-equalizer"/></svg><h1>Equalizer</h1></div><div class="eq-actions"><button class="btn" id="eq-enabled" aria-pressed="true">EQ on</button><button class="text-button" id="eq-reset">Reset EQ</button></div></div>
+                <div class="eq-response"><div class="eq-db-axis" aria-hidden="true"><span>+24 dB</span><span>0</span><span>−24 dB</span></div><div class="eq-plot"><svg id="eq-graph" viewBox="0 0 900 240" preserveAspectRatio="none" role="group" aria-label="Equalizer response. Drag a point to adjust its frequency band."><path class="eq-grid" d="M0 0H900 M0 60H900 M0 180H900 M0 240H900 M0 0V240 M210 0V240 M510 0V240 M810 0V240 M900 0V240"/><path class="eq-zero" d="M0 120H900"/><path id="eq-curve" d="M0 120H900"/></svg><div class="eq-frequency-axis" aria-hidden="true"><span>20 Hz</span><span>100</span><span>1k</span><span>10k</span><span>20k</span></div></div></div>
+                <div class="eq-band-heading"><h2>Frequency bands</h2><span>Drag points · ±12 dB</span></div>
+                <div class="eq-bands" id="eq-bands" role="group" aria-label="Equalizer frequency bands"></div>
+                <div class="eq-bottom"><div class="eq-preset-section"><div class="preset-heading"><h2>Presets</h2><span id="eq-preset-name">Flat</span></div><div class="eq-presets" id="eq-presets"></div></div><div class="eq-preamp-section"><div class="label-row"><label for="eq-preamp">Preamp</label><output id="eq-preamp-value" for="eq-preamp">0.0 dB</output></div><input id="eq-preamp" type="range" min="-24" max="6" step="0.5" value="0"><div class="eq-preamp-footer"><span>−24 to +6 dB</span><button class="text-button" id="eq-auto-gain">Auto gain</button></div></div></div>
+                <div class="eq-footnote"><p id="eq-headroom">Applied to playback and exports.</p><span>Double-click a band to reset it.</span></div>
+            </section>
+            <section class="tool-page delay-page" id="delay" role="tabpanel" aria-labelledby="dock-delay" hidden inert>
+                <div class="delay-heading"><div class="delay-title"><svg class="icon" aria-hidden="true"><use href="#i-delay"/></svg><h1>Delay</h1></div><div class="delay-actions"><button class="btn" id="delay-enabled" aria-pressed="false">Bypassed</button><button class="text-button" id="delay-reset">Reset delay</button></div></div>
+                <div class="delay-layout">
+                    <figure class="delay-response"><figcaption><h2>Repeat pattern</h2><span>Drag the first two repeats</span></figcaption><svg id="delay-graph" viewBox="0 0 480 260" preserveAspectRatio="none" role="group" aria-label="Delay repeat pattern. Drag the first repeat for time and mix, or the second for time and feedback."><path class="delay-grid" d="M8 20H472 M8 130H472 M124 20V240 M240 20V240 M356 20V240 M472 20V240"/><path class="delay-zero" d="M8 240H472"/><path id="delay-dry" d="M8 240V20"/><path id="delay-repeats" d=""/></svg><div class="delay-time-axis" aria-hidden="true"><span>0 s</span><span>1</span><span>2</span><span>3</span><span>4 s</span></div></figure>
+                    <div class="delay-controls">
+                        <div><div class="label-row"><label for="delay-time">Delay time</label><output id="delay-time-value" for="delay-time">300 ms</output></div><input id="delay-time" type="range" min="20" max="1000" step="1" value="300"><div class="range-labels"><span>20 ms</span><span>1,000 ms</span></div></div>
+                        <div><div class="label-row"><label for="delay-feedback">Feedback</label><output id="delay-feedback-value" for="delay-feedback">35%</output></div><input id="delay-feedback" type="range" min="0" max="80" step="1" value="35"><div class="range-labels"><span>One repeat</span><span>80%</span></div></div>
+                        <div><div class="label-row"><label for="delay-mix">Mix</label><output id="delay-mix-value" for="delay-mix">30%</output></div><input id="delay-mix" type="range" min="0" max="100" step="1" value="30"><div class="range-labels"><span>Dry</span><span>Wet</span></div></div>
+                    </div>
+                </div>
+                <div class="delay-presets-section"><div class="preset-heading"><h2>Presets</h2><span id="delay-preset-name">Off</span></div><div class="delay-presets" id="delay-presets"></div></div>
+                <div class="delay-footnote"><p id="delay-status">Bypassed for playback and export.</p><span>Feedback controls how long repeats last.</span></div>
+            </section>
+            <section class="tool-page distortion-page" id="distortion" role="tabpanel" aria-labelledby="dock-distortion" hidden inert>
+                <div class="distortion-heading"><div class="distortion-title"><svg class="icon" aria-hidden="true"><use href="#i-distortion"/></svg><h1>Distortion</h1></div><div class="distortion-actions"><button class="btn" id="distortion-enabled" aria-pressed="false">Bypassed</button><button class="text-button" id="distortion-reset">Reset distortion</button></div></div>
+                <div class="distortion-layout">
+                    <figure class="distortion-response"><figcaption><h2>Clipping curve</h2><span>Drag the curve to edit drive</span></figcaption><svg id="distortion-graph" viewBox="0 0 480 280" preserveAspectRatio="none" role="group" aria-label="Distortion clipping curve. Drag the point to adjust drive."><path class="distortion-grid" d="M0 0H480 M0 70H480 M0 210H480 M0 280H480 M120 0V280 M360 0V280"/><path class="distortion-zero" d="M0 140H480 M240 0V280"/><path class="distortion-reference" d="M0 280L480 0"/><path id="distortion-curve" d="M0 280L480 0"/></svg><div class="distortion-legend" aria-hidden="true"><span>Input level</span><span>Clipped output</span></div></figure>
+                    <div class="distortion-controls">
+                        <div><div class="label-row"><label for="distortion-drive">Drive</label><output id="distortion-drive-value" for="distortion-drive">+12 dB</output></div><input id="distortion-drive" type="range" min="0" max="36" step="0.5" value="12"><div class="range-labels"><span>0 dB</span><span>+36 dB</span></div></div>
+                        <div><div class="label-row"><label for="distortion-tone">Tone</label><output id="distortion-tone-value" for="distortion-tone">8.0 kHz</output></div><input id="distortion-tone" type="range" min="0" max="100" step="1" value="80"><div class="range-labels"><span>Dark</span><span>Bright</span></div></div>
+                        <div><div class="label-row"><label for="distortion-output">Output</label><output id="distortion-output-value" for="distortion-output">−9 dB</output></div><input id="distortion-output" type="range" min="-24" max="0" step="0.5" value="-9"><div class="range-labels"><span>−24 dB</span><span>0 dB</span></div></div>
+                        <div><div class="label-row"><label for="distortion-mix">Mix</label><output id="distortion-mix-value" for="distortion-mix">50%</output></div><input id="distortion-mix" type="range" min="0" max="100" step="1" value="50"><div class="range-labels"><span>Dry</span><span>Wet</span></div></div>
+                    </div>
+                </div>
+                <div class="distortion-presets-section"><div class="preset-heading"><h2>Presets</h2><span id="distortion-preset-name">Off</span></div><div class="distortion-presets" id="distortion-presets"></div></div>
+                <div class="distortion-footnote"><p id="distortion-status">Bypassed for playback and export.</p><span>Tone and output affect the wet signal.</span></div>
+            </section>
+            <section class="tool-page coming-soon-page" id="compressor" role="tabpanel" aria-labelledby="dock-compressor" hidden inert>
+                <div class="coming-soon-content">
+                    <svg class="soon-icon icon" aria-hidden="true"><use href="#i-compressor"/></svg>
+                    <h1 class="soon-heading">Compressor</h1>
+                    <p class="soon-message">Coming soon</p>
+                    <button class="text-button return-to-music">Back to music</button>
+                </div>
+            </section>
+            <section class="tool-page lufs-page" id="loudness" role="tabpanel" aria-labelledby="dock-loudness" hidden inert>
+                <div class="lufs-heading"><div class="lufs-title"><svg class="icon" aria-hidden="true"><use href="#i-loudness"/></svg><h1>LUFS checker</h1></div><button class="text-button" id="lufs-clear" disabled>Clear results</button></div>
+                <p class="lufs-intro">Measure the loudness of your audio files. Everything stays on your device.</p>
+                <div class="lufs-import">
+                    <svg class="icon" aria-hidden="true"><use href="#i-loudness"/></svg>
+                    <div><h2>Drop audio files here</h2><p>Mono or stereo · Up to 100 MB and 30 minutes per file</p><p>WAV, MP3, FLAC, M4A, OGG and other formats your browser supports.</p></div>
+                    <div class="lufs-import-actions"><button class="btn primary" id="lufs-browse">Choose files</button><button class="text-button" id="lufs-current" disabled>Check selected original</button></div>
+                </div>
+                <p class="lufs-source-note">Checks original files before editor effects. To check an edit, export it and choose the exported file here.</p>
+                <div class="lufs-progress-row"><p id="lufs-status" role="status">Choose audio files to measure.</p><button class="text-button" id="lufs-cancel" hidden>Cancel analysis</button></div>
+                <progress id="lufs-progress" max="100" aria-label="Loudness analysis progress" hidden></progress>
+                <div id="lufs-detail" hidden>
+                    <div class="lufs-result-heading"><h2 id="lufs-name"></h2><p id="lufs-meta"></p></div>
+                    <dl class="lufs-readings">
+                        <div class="lufs-main-reading"><dt>Integrated <span>LUFS</span></dt><dd id="lufs-integrated">N/A</dd></div>
+                        <div><dt>Loudness range <span>LU</span></dt><dd id="lufs-range">N/A</dd></div>
+                        <div><dt>True peak <span>dBTP</span></dt><dd id="lufs-true-peak">N/A</dd></div>
+                        <div><dt>Sample peak <span>dBFS</span></dt><dd id="lufs-sample-peak">N/A</dd></div>
+                    </dl>
+                    <figure class="lufs-chart">
+                        <figcaption><h2>Loudness over time</h2><div class="lufs-legend"><span>Momentary · 400 ms</span><span>Short-term · 3 s</span></div></figcaption>
+                        <div class="lufs-plot-row"><div class="lufs-axis" aria-hidden="true"><span id="lufs-axis-top">0 LUFS</span><span id="lufs-axis-middle">−35</span><span>−70</span></div><div class="lufs-plot"><svg id="lufs-graph" viewBox="0 0 900 220" preserveAspectRatio="none" role="img" aria-label="Loudness over time"><path class="lufs-grid" d="M0 0H900 M0 55H900 M0 110H900 M0 165H900 M0 220H900 M225 0V220 M450 0V220 M675 0V220"/><path id="lufs-momentary"/><path id="lufs-short-term"/></svg><div class="lufs-time-axis" aria-hidden="true"><span>0:00</span><span id="lufs-graph-end">0:00</span></div></div></div>
+                    </figure>
+                    <div class="lufs-maxima"><span>Max momentary: <strong id="lufs-max-momentary">N/A</strong> LUFS</span><span>Max short-term: <strong id="lufs-max-short">N/A</strong> LUFS</span></div>
+                    <p class="lufs-reading-note" id="lufs-reading-note"></p>
+                    <div class="lufs-target-row"><label for="lufs-target">Compare target <span>LUFS</span></label><input id="lufs-target" type="number" min="-70" max="0" step="0.1" value="-14"><p id="lufs-gain"></p></div>
+                </div>
+                <p class="lufs-empty" id="lufs-empty">Your measurements will appear here.</p>
+                <div class="lufs-table-wrap" id="lufs-table-wrap" role="region" aria-label="File loudness measurements" tabindex="0" hidden>
+                    <table class="lufs-table"><caption>File measurements. Select a completed file to view its graph.</caption><thead><tr><th scope="col">File</th><th scope="col">Duration</th><th scope="col">LUFS</th><th scope="col">LRA · LU</th><th scope="col">Peak · dBTP</th><th scope="col">Status</th></tr></thead><tbody id="lufs-rows"></tbody></table>
+                </div>
+                <div class="lufs-footer"><p>BS.1770-4 loudness · EBU Tech 3342 LRA · 4× true peak<br>Files are decoded at 48 kHz for analysis. Browser decoding can affect readings.</p><div><button class="btn" id="lufs-copy" disabled>Copy report</button><button class="btn" id="lufs-download" disabled>Download report</button></div></div>
+                <input type="file" id="lufs-upload" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.aiff,.aif,.webm" multiple hidden>
+            </section>
+        </main>
+        <footer class="site-footer"><button class="text-button" id="shortcuts-button"><kbd>Space</kbd> play / pause <span>· Keyboard shortcuts</span></button></footer>
     </div>
-
-    <div class="export-bar" id="export-bar" aria-live="polite">
-        <div class="export-top">
-        <div class="export-title" id="export-title">Exporting…</div>
-
-        <div style="display:flex; align-items:center; gap:10px;">
-            <button id="export-cancel" class="export-cancel-btn" type="button" disabled>Cancel</button>
-            <div class="export-pct" id="export-pct">0%</div>
-        </div>
-        </div>
-
-        <div class="export-track">
-        <div class="export-fill" id="export-fill"></div>
-        </div>
-    </div>
-
-    <script src="./js/bg-waves.js"></script>
-    <script src="./js/app.js"></script>
-    <script src="./js/export.js"></script>
+    <input type="file" id="audio-upload" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.aiff,.aif,.webm" multiple hidden>
+    <div class="drop-overlay" id="drop-overlay" hidden><svg class="icon"><use href="#i-plus"/></svg><h2>Drop to add to your library</h2></div>
+    <section id="preset-preview" class="preset-preview" aria-label="Preset preview" hidden>
+        <div class="preset-preview-info"><p id="preset-preview-name" role="status"></p><p id="preset-preview-target"></p></div>
+        <div class="preset-preview-actions"><button class="btn" id="preset-preview-undo">Undo preview</button><button class="btn primary" id="preset-preview-apply">Apply preset</button></div>
+    </section>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <div class="export-bar" id="export-bar" hidden><div class="export-top"><span id="export-title" role="status">Exporting…</span><span id="export-pct">0%</span><button id="export-cancel" class="btn" disabled>Cancel</button></div><div class="export-track" id="export-progress" role="progressbar" aria-label="Export progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="export-fill"></div></div></div>
+    <dialog id="preset-dialog" aria-labelledby="preset-dialog-title"><form id="preset-form"><h2 id="preset-dialog-title">Save current sound</h2><p>Includes speed, pitch, reverb, EQ, delay, and distortion settings.</p><label for="preset-input">Preset name</label><input id="preset-input" maxlength="80" required autocomplete="off" placeholder="Late night"><label for="preset-description-input">Description (optional)</label><textarea id="preset-description-input" maxlength="240" rows="3" placeholder="What does this sound work well for?"></textarea><p id="preset-dialog-error" role="alert"></p><div class="dialog-actions"><button type="button" class="btn" id="preset-cancel">Cancel</button><button type="submit" class="btn primary">Save preset</button></div></form></dialog>
+    <dialog id="preset-delete-dialog" aria-labelledby="preset-delete-title"><h2 id="preset-delete-title">Delete preset</h2><p id="preset-delete-name"></p><div class="dialog-actions"><button type="button" class="btn" id="preset-delete-cancel" autofocus>Cancel</button><button type="button" class="btn" id="preset-delete-confirm">Delete preset</button></div></dialog>
+    <input type="file" id="session-upload" accept=".virality" hidden>
+    <dialog id="session-dialog" aria-labelledby="session-dialog-title"><h2 id="session-dialog-title">Open session</h2><p id="session-summary"></p><p>This replaces your current tracks and sound settings. Your saved presets stay in this browser.</p><p id="session-error" role="alert"></p><button type="button" class="text-button" id="session-backup">Save current session first</button><div class="dialog-actions"><button type="button" class="btn" id="session-cancel">Cancel</button><button type="button" class="btn primary" id="session-confirm">Open session</button></div></dialog>
+    <dialog id="help-dialog" aria-labelledby="help-title"><h2 id="help-title">Keyboard shortcuts</h2><dl><div><dt>Undo / redo sound edits</dt><dd><kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></dd></div><div><dt>Cycle tools (dock focused)</dt><dd><kbd>↑</kbd> <kbd>↓</kbd></dd></div><div><dt>Play / pause</dt><dd><kbd>Space</kbd></dd></div><div><dt>Seek 5 seconds</dt><dd><kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Previous / next track</dt><dd><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dd></div><div><dt>Mute preview</dt><dd><kbd>M</kbd></dd></div><div><dt>Repeat track</dt><dd><kbd>R</kbd></dd></div></dl><p>Speed also changes pitch. Preview volume does not affect exports.</p><form method="dialog"><button class="btn primary">Got it</button></form></dialog>
+    <noscript><p class="notice">Enable JavaScript to use the audio editor.</p></noscript>
 </body>
 </html>
