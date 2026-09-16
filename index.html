@@ -6,16 +6,16 @@
     <meta name="theme-color" content="#07358d">
     <meta name="description" content="A PSP-inspired audio editor for slowed + reverb, nightcore, and local WAV and MP3 exports.">
     <title>Virality · Audio editor</title>
-    <link rel="stylesheet" href="./style.css?v=2.13">
+    <link rel="stylesheet" href="./style.css?v=2.14">
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script defer src="./js/bg-waves.js?v=2.0"></script>
     <script defer src="./js/equalizer.js?v=1.1"></script>
     <script defer src="./js/distortion.js?v=1.0"></script>
     <script defer src="./js/delay.js?v=1.0"></script>
     <script defer src="./js/audio-chain.js?v=1.2"></script>
-    <script defer src="./js/app.js?v=2.7"></script>
+    <script defer src="./js/app.js?v=2.8"></script>
     <script defer src="./js/preset-data.js?v=1.0"></script>
-    <script defer src="./js/presets.js?v=1.0"></script>
+    <script defer src="./js/presets.js?v=1.1"></script>
     <script defer src="./js/loudness-worker.js?v=1.1"></script>
     <script defer src="./js/loudness.js?v=1.1"></script>
     <script defer src="./js/export.js?v=2.2"></script>
@@ -113,7 +113,7 @@
                         <details class="presets-eq-details"><summary>EQ band values</summary><dl id="presets-bands"></dl></details>
                         <p id="presets-target"></p>
                         <div class="presets-apply-actions"><button class="btn primary" id="presets-apply">Apply preset</button><button class="btn" id="presets-apply-all">Apply to all tracks</button></div>
-                        <p class="presets-apply-note">Replaces speed and all effect settings, including bypass states.</p>
+                        <p class="presets-apply-note">Click a preset to preview its sound. Apply keeps the changes. Undo restores your previous settings.</p>
                         <div class="presets-manage-actions"><button class="btn" id="presets-update">Update from current sound</button><button class="btn" id="presets-edit">Edit name / description</button><button class="btn" id="presets-duplicate">Duplicate</button><button class="btn" id="presets-export">Export preset</button><button class="text-button" id="presets-delete">Delete</button></div>
                     </section>
                 </div>
@@ -202,6 +202,10 @@
     </div>
     <input type="file" id="audio-upload" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.aiff,.aif,.webm" multiple hidden>
     <div class="drop-overlay" id="drop-overlay" hidden><svg class="icon"><use href="#i-plus"/></svg><h2>Drop to add to your library</h2></div>
+    <section id="preset-preview" class="preset-preview" aria-label="Preset preview" hidden>
+        <div class="preset-preview-info"><p id="preset-preview-name" role="status"></p><p id="preset-preview-target"></p></div>
+        <div class="preset-preview-actions"><button class="btn" id="preset-preview-undo">Undo preview</button><button class="btn primary" id="preset-preview-apply">Apply preset</button></div>
+    </section>
     <div id="notice" class="notice" role="status" hidden></div>
     <div class="export-bar" id="export-bar" hidden><div class="export-top"><span id="export-title" role="status">Exporting…</span><span id="export-pct">0%</span><button id="export-cancel" class="btn" disabled>Cancel</button></div><div class="export-track" id="export-progress" role="progressbar" aria-label="Export progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="export-fill"></div></div></div>
     <dialog id="preset-dialog" aria-labelledby="preset-dialog-title"><form id="preset-form"><h2 id="preset-dialog-title">Save current sound</h2><p>Includes speed, reverb, EQ, delay, and distortion settings.</p><label for="preset-input">Preset name</label><input id="preset-input" maxlength="80" required autocomplete="off" placeholder="Late night"><label for="preset-description-input">Description (optional)</label><textarea id="preset-description-input" maxlength="240" rows="3" placeholder="What does this sound work well for?"></textarea><p id="preset-dialog-error" role="alert"></p><div class="dialog-actions"><button type="button" class="btn" id="preset-cancel">Cancel</button><button type="submit" class="btn primary">Save preset</button></div></form></dialog>

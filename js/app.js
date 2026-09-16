@@ -51,11 +51,12 @@
     PSP.currentSettings = () => ({ speed: Number(PSP.speedS.value), mix: Number(PSP.mixS.value), decay: Number(PSP.decayS.value) });
     PSP.defaultSettings = () => ({ speed: 1, mix: 0, decay: 2, eq: PSP.eq.defaults(), distortion: PSP.distortion.defaults(), delay: PSP.delay.defaults(), preset: 'Default', presetId: 'default' });
     PSP.captureSettings = () => ({ ...PSP.currentSettings(), eq: PSP.eq.snapshot(), distortion: PSP.distortion.snapshot(), delay: PSP.delay.snapshot(), preset: PSP.currentPresetName, presetId: selectedPreset });
+    PSP.committedSettings = () => PSP.presets?.committedSettings() ?? PSP.captureSettings();
     PSP.saveCurrentSettings = () => {
         PSP.presets?.sync();
         const track = PSP.playlist[PSP.currentIndex];
         if (track) {
-            track.settings = PSP.captureSettings();
+            track.settings = PSP.committedSettings();
             const meta = document.querySelector('.file-item.active-track .track-meta');
             if (!track.error) {
                 if (meta) meta.textContent = trackMeta(track);
@@ -234,7 +235,7 @@
     function handleFiles(files) {
         if (PSP.isExporting) { PSP.notify('Wait for the export to finish before adding tracks.'); return; }
         let added = 0, skipped = 0;
-        const initialSettings = PSP.currentIndex < 0 ? PSP.captureSettings() : PSP.defaultSettings();
+        const initialSettings = PSP.currentIndex < 0 ? PSP.committedSettings() : PSP.defaultSettings();
         for (const file of files) {
             if (!file.size || !(file.type.startsWith('audio/') || /\.(mp3|wav|flac|m4a|aac|ogg|opus|aiff?|webm)$/i.test(file.name))) { skipped++; continue; }
             if (PSP.playlist.some(track => track.name === file.name && track.size === file.size && track.modified === file.lastModified)) { skipped++; continue; }
@@ -284,7 +285,7 @@
         PSP.isLoaded = false;
         PSP.isLoading = true;
         PSP.currentIndex = index;
-        restoreSettings(track.settings);
+        restoreSettings(PSP.presets?.settingsForTrack(track) ?? track.settings);
         setTitle(track.name.replace(/\.[^/.]+$/, ''));
         $('track-detail').textContent = trackMeta(track);
         renderList();
